@@ -26,10 +26,10 @@ class Fold:
     test:     np.ndarray
 
 
-def sequential(n: int, train_frac: float = 0.70, val_frac: float = 0.15) -> Split:
+def sequential(n: int, train_frac: float = 0.50, val_frac: float = 0.25) -> Split:
     """
     Split n rows into train/val/test by position (earliest → latest).
-    Default: 70% train, 15% val, 15% test.
+    Default: 50% train, 25% val, 25% test.
     """
     if train_frac + val_frac >= 1.0:
         raise ValueError("train_frac + val_frac must be < 1.0")
