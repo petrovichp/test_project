@@ -52,37 +52,61 @@ Caching rule: save expensive intermediates to `cache/` as `.parquet` or `.npy`. 
 
 ## Current research state
 
+### Features pipeline — done
+130 features across 4 modules, zero NaN after gap masking (MAX_LOOKBACK=1440).
+Cached to `cache/btc_features_*.parquet`. Load via `features/assembly.py`.
+
+| Module | Features | Key contents |
+|---|---|---|
+| `features/orderbook.py` | 32 | bucket amounts, imbalance, velocity, span |
+| `features/price.py` | 51 | returns, SMA/EMA, RSI, MACD, VWAP, basis |
+| `features/volume.py` | 17 | taker imbalance/net, vol z-score, OBV, OFI |
+| `features/market.py` | 30 | OI, funding rate, spread, calendar, sessions |
+
+Splits after gap masking: Train 70,902 (Jul→Oct 2025) / Val 35,451 (Oct→Dec 2025) / Test 35,451 (Dec 2025→Apr 2026).
+
 ### Volatility model — done (`models/volatility.py`)
-Tested 3 target types × 5 horizons using LightGBM on BTC.
+Uses assembled features. Results cached at `cache/btc_volatility_eval.parquet`.
 
-| Target | H=15 | H=30 | H=60 | H=100 | H=240 |
-|---|---|---|---|---|---|
-| ATR | **0.727** | **0.724** | 0.692 | **0.704** | 0.591 |
-| Realized vol | 0.696 | 0.674 | 0.628 | 0.617 | 0.448 |
-| Price range | 0.614 | 0.554 | 0.493 | 0.445 | 0.265 |
+| Target | Val Spearman | Test Spearman |
+|---|---|---|
+| ATR H=15 | 0.647 | **0.784** |
+| ATR H=30 | 0.627 | **0.801** |
+| Realized vol H=15 | 0.605 | 0.790 |
 
-ATR at H=15–100 is the most predictable. Results cached at `cache/btc_volatility_research.parquet`.
+Walk-forward atr_15: all 6 folds positive (0.57–0.80). Top features: `bb_width`, `dow_sin`, `hour_sin`, `vwap_dev_1440`, `oi_z_1440`.
+Val underperforms test — val period (Oct–Dec 2025) covers the Nov outage, a harder regime.
+Quantile regression (75/90th pct) runs but coverage undershoots on val, corrects on test.
 
-**Next steps for vol model:**
-- Walk-forward validation on best combinations (ATR H=15, ATR H=30, realized_vol H=15)
-- Add OB features (span, imbalance, velocity) — currently excluded
-- Quantile regression (predict 75th/90th percentile, more useful for TP/SL sizing)
-- Test on ETH and SOL
+### Direction model — LightGBM done (`models/direction.py`)
+Results cached at `cache/btc_direction_eval.parquet`.
 
-### Direction model — not yet built
-Needs `features/` modules first. See `RESEARCH_PROMPT.md` for full agenda.
+| Label | Val AUC | Test AUC | Gap |
+|---|---|---|---|
+| down_60 | 0.684 | **0.698** | ✓ 0.015 |
+| up_60 | 0.599 | 0.689 | ⚠ 0.091 |
+| down_100 | 0.592 | 0.675 | ⚠ 0.083 |
+| up_100 | 0.578 | 0.655 | ⚠ 0.077 |
+
+Walk-forward up_60: **6/6 folds > 0.52**, mean AUC 0.66. **Gate to DL stage: PASS.**
+Top features: `vwap_1440`, `bb_width`, `fund_mom_480/1440`, `obv_1440`, `oi_z_1440`, `hour_sin/cos`, `taker_net_60`.
+down_60 is the most stable model (smallest val/test gap).
+
+### DL models — next
+CNN-LSTM hybrid → DeepLOB → Ensemble.
 
 ## Project structure
 
 ```
 data/          loader.py, gaps.py
-features/      orderbook.py, price.py, volume.py, market.py, assembly.py  ← to build
-models/        splits.py, volatility.py, direction.py  ← direction.py empty
+features/      orderbook.py, price.py, volume.py, market.py, assembly.py
+models/        splits.py, volatility.py, direction.py  ← LightGBM done
+               direction_dl.py  ← to build (CNN-LSTM, DeepLOB)
 strategy/      agent.py, genetic.py  ← empty stubs
 backtest/      engine.py, costs.py   ← empty stubs
 validation/    walkforward.py        ← empty stub
 cache/         parquet and npy files (gitignored)
-RESEARCH_PROMPT.md  full research agenda with feature/model details
+RESEARCH_PROMPT.md  full research agenda
 ```
 
 ## Code style
