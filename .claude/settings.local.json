@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "Bash(gh repo *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3)",
+      "Bash(python3 /tmp/btc_analysis.py)"
+    ]
+  }
+}

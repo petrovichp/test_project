@@ -1,0 +1,15 @@
+cache/
+!cache/.gitkeep
+
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+saved_models/
+*.pkl
+
+.env
+venv/
+.venv/
+*.egg-info/
