@@ -152,38 +152,74 @@ Y_down = (min(price[t+1:t+H+1]) / price[t] - 1) < -threshold  # e.g. -0.8%
 
 Also try risk-adjusted label: `raw_return / realized_vol` — normalises for regime.
 
-### Model Architectures (explore in this order)
+### Two-Stage Pipeline (final form)
 
-**1. LightGBM — primary baseline**
-- Input: flat feature vector (~200–300 features) per bar
-- Params: `num_leaves=64`, `min_data_in_leaf=100`, `feature_fraction=0.7`, early stopping
-- Run SHAP feature importance — prune zero-importance features, audit high-importance ones for leakage
+```
+Volatility model → predicted ATR
+        ↓
+Direction model (uses predicted ATR as a feature)
+        ↓
+Trade signal: direction × confidence × vol-adjusted size
+```
 
-**2. Multi-input DNN with temporal encoding (improved baseline)**
-- Separate branch per feature group, each as `(batch, lookback, n_features)` — do NOT flatten first
-- Each branch: `LSTM(64)` or `CausalConv1D + GlobalMaxPool`
-- Concat → Dense(256) → Dense(64) → sigmoid
+The volatility prediction feeds into the direction model as a feature — high predicted ATR means
+larger expected moves, which helps calibrate the confidence threshold for entry.
 
-**3. CNN-LSTM hybrid (best DL baseline for 1-min crypto)**
-- Input: `(batch, 60, n_features)` — 60-bar window, 20–30 most dynamic features
-- `CausalConv1D(64, kernel=5)` → `GRU(128)` → Dense → sigmoid
-- `padding='causal'` eliminates sequence-level lookahead
+---
 
-**4. DeepLOB variant (OB specialist)**
-- Input: `(batch, 100, 40)` — 100 bars × top-20 levels per side
-- Conv2D blocks → Inception module → LSTM(64) → sigmoid
-- Top 20–50 bins only (beyond that adds noise)
+### Model Training Plan
 
-**5. Ensemble**
-- Weighted average: `0.4*LightGBM + 0.25*CatBoost + 0.2*CNN_LSTM + 0.15*DeepLOB`
-- Weights from walk-forward Sharpe
-- Does ensemble beat best single model on 6 folds consistently?
+#### Volatility Models — predict *how much* price will move
+
+Used for position sizing and dynamic TP/SL.
+
+| Model | Target | Horizons | Status |
+|---|---|---|---|
+| LightGBM regressor | ATR | 15, 30, 60, 100 bars | Done — Spearman 0.70–0.73 |
+| LightGBM regressor | Realized vol | 15, 30, 60, 100 bars | Done — Spearman 0.62–0.70 |
+| LightGBM quantile (75th, 90th) | ATR | 15, 30 bars | Next — better for TP/SL sizing |
+| LightGBM + OB features | ATR | 15, 30 bars | Next — add span, imbalance, velocity |
+| Multi-output LightGBM | ATR all horizons | 15, 30, 60, 100 | Later — shared features, all horizons at once |
+
+#### Direction Models — predict *which way* price will move
+
+Binary signal: will price go up / down more than X% in the next H bars.
+**Do not build DL models until LightGBM confirms real signal on walk-forward.**
+
+**Stage 1 — Tabular baselines**
+
+| Model | Input | Notes |
+|---|---|---|
+| LightGBM | Flat ~200–300 features per bar | Primary baseline. SHAP for leakage audit. |
+| CatBoost | Same + calendar as native categoricals | Compare AUC vs LightGBM |
+
+Params: `num_leaves=64`, `min_data_in_leaf=100`, `feature_fraction=0.7`, early stopping on time-ordered val.
+Gate to Stage 2: walk-forward AUC > 0.52 on 5+ of 6 folds.
+
+**Stage 2 — Deep learning**
+
+| Model | Input shape | What it captures |
+|---|---|---|
+| Multi-input DNN + LSTM branches | `(batch, lookback, n_features)` per group | Temporal structure per feature group |
+| CNN-LSTM hybrid | `(batch, 60, ~25 features)` | Local patterns → temporal evolution. Best DL baseline for 1-min crypto. |
+| DeepLOB variant | `(batch, 100, 40 OB levels)` | OB spatial + temporal structure. Top 20–50 bins only. |
+
+CNN-LSTM: `CausalConv1D(64, kernel=5, padding='causal')` → `GRU(128)` → Dense → sigmoid.
+DeepLOB: Conv2D blocks → Inception module → LSTM(64) → sigmoid.
+
+**Stage 3 — Ensemble**
+
+| Model | Composition | Weights |
+|---|---|---|
+| Weighted average | LightGBM + CatBoost + CNN-LSTM + DeepLOB | From walk-forward Sharpe |
+
+Evaluate: does ensemble consistently beat best single model across all 6 folds?
 
 ### Validation Protocol
 
-1. LightGBM with sequential split → compare AUC to original notebook (which had leakage). Quantify gap.
-2. Walk-forward on LightGBM → per-fold AUC. Signal is real if AUC > 0.52 on 5+ of 6 folds.
-3. DL models → compare walk-forward AUC vs LightGBM.
+1. LightGBM sequential split → compare AUC to original notebook (leaky). Quantify the gap.
+2. Walk-forward LightGBM → per-fold AUC. Gate check: 5+ of 6 folds > 0.52.
+3. DL models → compare walk-forward AUC vs LightGBM baseline.
 4. Ablation: remove one feature group at a time, rank by AUC contribution.
 5. Ensemble → does it improve on best single model?
 
