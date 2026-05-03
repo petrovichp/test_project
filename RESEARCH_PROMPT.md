@@ -215,13 +215,42 @@ DeepLOB: Conv2D blocks → Inception module → LSTM(64) → sigmoid.
 
 Evaluate: does ensemble consistently beat best single model across all 6 folds?
 
-### Validation Protocol
+### Evaluation Protocol (apply to every model trained)
 
-1. LightGBM sequential split → compare AUC to original notebook (leaky). Quantify the gap.
-2. Walk-forward LightGBM → per-fold AUC. Gate check: 5+ of 6 folds > 0.52.
-3. DL models → compare walk-forward AUC vs LightGBM baseline.
-4. Ablation: remove one feature group at a time, rank by AUC contribution.
-5. Ensemble → does it improve on best single model?
+Every model goes through the same three-step evaluation before any conclusions are drawn.
+Results are printed and saved to `cache/{ticker}_{model_name}_eval.parquet`.
+
+**Step 1 — Train**
+- Train on train split (50% of data, Jul 2025 → Dec 2025)
+- Early stopping evaluated on val split — never on test
+- Save model to `cache/`
+
+**Step 2 — Val analysis**
+- Evaluate on val split (25%, Dec 2025 → Feb 2026)
+- Report: AUC / Spearman / RMSE (depending on task), feature importance (SHAP for LightGBM)
+- Plot: prediction distribution, calibration curve, performance over time
+- Decision point: is val performance above the signal threshold?
+  - Direction: AUC > 0.52
+  - Volatility: Spearman > 0.40
+  - If below threshold → diagnose (leakage? poor features? wrong label?) before touching test
+
+**Step 3 — Test analysis (run once, after val passes)**
+- Evaluate on test split (25%, Feb 2026 → Apr 2026)
+- Report same metrics as val
+- Compare val vs test: large gap = overfitting to val period, investigate
+- This is the honest number — do not re-tune after seeing test results
+
+**Analysis checklist after each model:**
+- [ ] Are val and test metrics consistent? (gap < 10% relative)
+- [ ] Does SHAP show sensible features driving predictions? (flag suspiciously dominant features)
+- [ ] Is prediction distribution well-calibrated? (not collapsed to 0.5)
+- [ ] Does performance degrade in specific date ranges? (check Nov 2025 outage period)
+- [ ] Walk-forward: is signal consistent across all 6 folds or concentrated in 1–2?
+
+**Walk-forward gate (direction models only)**
+After sequential train/val/test passes: run 6-fold walk-forward.
+Gate to next stage: AUC > 0.52 on 5+ of 6 folds.
+If gate fails: go back to features, not to a more complex model.
 
 ---
 
