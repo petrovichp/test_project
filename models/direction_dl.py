@@ -31,7 +31,7 @@ from features.assembly import assemble
 
 CACHE_DIR = Path(__file__).parent.parent / "cache"
 
-SEQ_LEN   = 60       # lookback window in bars
+SEQ_LEN   = 30       # lookback window in bars (cut from 60 → 30 for speed)
 THRESHOLD = 0.008
 HORIZONS  = [60, 100]
 
@@ -52,7 +52,7 @@ SEQ_FEATURES = [
     "perp_spread_bps", "perp_imbalance",
 ]
 
-OB_LEVELS = 20   # top-N bins per side — signal drops past level 20, 20 keeps matrix small
+OB_LEVELS = 10   # top-N bins per side — cut from 20→10 for speed; >10 adds noise not signal
 
 
 # ── label computation (identical to direction.py) ─────────────────────────────
@@ -95,21 +95,19 @@ def _build_sequences(X: np.ndarray, y: np.ndarray, seq_len: int):
 
 def build_cnn_lstm(seq_len: int, n_features: int) -> Model:
     inp = Input(shape=(seq_len, n_features))
-    x = layers.Conv1D(64, kernel_size=5, padding="causal", activation="relu")(inp)
-    x = layers.Conv1D(32, kernel_size=3, padding="causal", activation="relu")(x)
-    x = layers.GRU(128, return_sequences=False)(x)
+    x = layers.Conv1D(32, kernel_size=3, padding="causal", activation="relu")(inp)
+    x = layers.GRU(64, return_sequences=False)(x)
     x = layers.Dropout(0.3)(x)
-    x = layers.Dense(64, activation="relu")(x)
-    x = layers.Dropout(0.2)(x)
+    x = layers.Dense(32, activation="relu")(x)
     out = layers.Dense(1, activation="sigmoid")(x)
     model = Model(inp, out)
     model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["AUC"])
     return model
 
 
-# ── DeepLOB architecture ──────────────────────────────────────────────────────
+# ── DeepLOB architecture (light) ─────────────────────────────────────────────
 
-def _inception_block(x, filters=32):
+def _inception_block(x, filters=16):
     b1 = layers.Conv2D(filters, (1, 1), padding="same", activation="relu")(x)
     b2 = layers.Conv2D(filters, (3, 1), padding="same", activation="relu")(x)
     b3 = layers.MaxPooling2D((3, 1), strides=(1, 1), padding="same")(x)
@@ -120,14 +118,12 @@ def _inception_block(x, filters=32):
 def build_deeplob(seq_len: int, ob_levels: int) -> Model:
     # input: (seq_len, ob_levels*4, 1) — 4 channels = spot/perp × bids/asks
     inp = Input(shape=(seq_len, ob_levels * 4, 1))
-    x = layers.Conv2D(32, (1, 2), strides=(1, 2), activation="relu")(inp)
-    x = layers.Conv2D(32, (4, 1), padding="same", activation="relu")(x)
-    x = layers.Conv2D(32, (4, 1), padding="same", activation="relu")(x)
-    x = _inception_block(x, 32)
-    x = _inception_block(x, 32)
-    x = layers.Reshape((x.shape[1], -1))(x)   # (seq, features)
-    x = layers.LSTM(64)(x)
-    x = layers.Dense(32, activation="relu")(x)
+    x = layers.Conv2D(16, (1, 2), strides=(1, 2), activation="relu")(inp)
+    x = layers.Conv2D(16, (3, 1), padding="same", activation="relu")(x)
+    x = _inception_block(x, 16)
+    x = layers.Reshape((x.shape[1], -1))(x)
+    x = layers.LSTM(32)(x)
+    x = layers.Dense(16, activation="relu")(x)
     out = layers.Dense(1, activation="sigmoid")(x)
     model = Model(inp, out)
     model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["AUC"])
@@ -208,8 +204,15 @@ def run_cnn_lstm(ticker: str):
             print(f"  Train: {len(y_seq_tr):,} seqs  positives={pos:.1%}  "
                   f"{fmt(ts_train[SEQ_LEN])} → {fmt(ts_train[-1])}")
 
-            model = build_cnn_lstm(SEQ_LEN, n_feat)
-            _fit(model, X_seq_tr, y_seq_tr, X_seq_v, y_seq_v)
+            model_path = CACHE_DIR / f"{ticker}_cnn_lstm_{col}.keras"
+            if model_path.exists():
+                print(f"  Loading cached model: {model_path.name}")
+                model = tf.keras.models.load_model(str(model_path))
+            else:
+                model = build_cnn_lstm(SEQ_LEN, n_feat)
+                _fit(model, X_seq_tr, y_seq_tr, X_seq_v, y_seq_v)
+                model.save(str(model_path))
+                print(f"  Saved → {model_path.name}")
 
             auc_val  = _auc(y_seq_v,  model.predict(X_seq_v,  verbose=0).flatten())
             auc_test = _auc(y_seq_te, model.predict(X_seq_te, verbose=0).flatten())
