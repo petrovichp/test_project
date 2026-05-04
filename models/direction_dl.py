@@ -52,7 +52,7 @@ SEQ_FEATURES = [
     "perp_spread_bps", "perp_imbalance",
 ]
 
-OB_LEVELS = 50   # top-N bins per side for DeepLOB (spot+perp × bids+asks = 4 channels)
+OB_LEVELS = 20   # top-N bins per side — signal drops past level 20, 20 keeps matrix small
 
 
 # ── label computation (identical to direction.py) ─────────────────────────────
@@ -233,48 +233,59 @@ def run_deeplob(ticker: str):
     print(f"  DeepLOB — {ticker.upper()}")
     print(f"{'='*60}\n")
 
-    meta, ob = load(ticker, include_ob=True)
-    ts_map   = dict(zip(meta["timestamp"].values, range(len(meta))))
-    price    = meta["perp_ask_price"].values
-    all_lbl  = _compute_labels(price)
+    # ── load / build cached OB matrix ────────────────────────────────────────
+    ob_cache = CACHE_DIR / f"{ticker}_deeplob_ob{OB_LEVELS}_scaled.npz"
+    idx_cache = CACHE_DIR / f"{ticker}_deeplob_split_idx.npz"
 
-    # build OB matrix: top OB_LEVELS bins × 4 channels (spot_bids, spot_asks, perp_bids, perp_asks)
-    def _get_ob_channels():
+    meta    = load_meta(ticker)
+    ts_map  = dict(zip(meta["timestamp"].values, range(len(meta))))
+    price   = meta["perp_ask_price"].values
+    all_lbl = _compute_labels(price)
+
+    assembled = pd.read_parquet(CACHE_DIR / f"{ticker}_features_assembled.parquet")
+    fc        = [c for c in assembled.columns if c != "timestamp"]
+    meta_ts   = meta["timestamp"].values
+    gap_ok    = _cmask(pd.Series(meta_ts), max_lookback=1440)
+    X_all     = assembled[fc].values
+    row_ok    = gap_ok & ~np.isnan(X_all).any(axis=1)
+    sp        = sequential(row_ok.sum())
+    clean_idx = np.where(row_ok)[0]
+    tr_idx    = clean_idx[sp.train]
+    val_idx   = clean_idx[sp.val]
+    te_idx    = clean_idx[sp.test]
+
+    if ob_cache.exists() and idx_cache.exists():
+        print("  Loading cached scaled OB matrix ...")
+        arrs  = np.load(ob_cache)
+        ob_tr, ob_v, ob_te = arrs["tr"], arrs["v"], arrs["te"]
+    else:
+        print("  Building OB channel matrix (top 20 levels, 4 channels) ...")
+        _, ob_df = load(ticker, include_ob=True)
         channels = []
         for inst in ["spot", "perp"]:
             for side in ["bids", "asks"]:
                 cols = [f"{inst}_{side}_amount_{i}" for i in range(OB_LEVELS)]
-                channels.append(ob[cols].values)
-        return np.stack(channels, axis=-1)   # (n, OB_LEVELS, 4)
+                channels.append(ob_df[cols].values.astype(np.float32))
+        ob_mat = np.stack(channels, axis=-1)   # (n, OB_LEVELS, 4)
+        del ob_df
 
-    print("  Building OB channel matrix ...")
-    ob_mat = _get_ob_channels()   # (n, OB_LEVELS, 4)
+        sc   = StandardScaler()
+        flat = ob_mat[tr_idx].reshape(-1, OB_LEVELS * 4)
+        sc.fit(flat)
 
-    # scale each channel by its own rolling stats — fit on train only
-    meta_ts = meta["timestamp"].values
-    gap_ok  = _cmask(pd.Series(meta_ts), max_lookback=1440)
-    assembled = pd.read_parquet(CACHE_DIR / f"{ticker}_features_assembled.parquet")
-    fc   = [c for c in assembled.columns if c != "timestamp"]
-    X_all = assembled[fc].values
-    row_ok = gap_ok & ~np.isnan(X_all).any(axis=1)
-    ts_clean = assembled["timestamp"].values[row_ok]
+        def _scale(idx):
+            return sc.transform(
+                ob_mat[idx].reshape(-1, OB_LEVELS * 4)
+            ).reshape(-1, OB_LEVELS, 4).astype(np.float32)
 
-    sp = sequential(row_ok.sum())
-    clean_idx = np.where(row_ok)[0]
-    tr_idx  = clean_idx[sp.train]
-    val_idx = clean_idx[sp.val]
-    te_idx  = clean_idx[sp.test]
+        ob_tr = _scale(tr_idx)
+        ob_v  = _scale(val_idx)
+        ob_te = _scale(te_idx)
+        del ob_mat
 
-    # scale OB channels using train stats
-    sc    = StandardScaler()
-    flat  = ob_mat[tr_idx].reshape(-1, OB_LEVELS * 4)
-    sc.fit(flat)
-    def _scale(idx):
-        m = ob_mat[idx].reshape(-1, OB_LEVELS * 4)
-        return sc.transform(m).reshape(-1, OB_LEVELS, 4)
-    ob_tr = _scale(tr_idx)
-    ob_v  = _scale(val_idx)
-    ob_te = _scale(te_idx)
+        np.savez_compressed(ob_cache, tr=ob_tr, v=ob_v, te=ob_te)
+        print(f"  Cached → {ob_cache.name}  "
+              f"({ob_cache.stat().st_size // 1024 // 1024} MB)")
 
     fmt  = lambda ts: datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
     rows = []
