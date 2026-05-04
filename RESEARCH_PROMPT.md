@@ -2,8 +2,8 @@
 
 ## Project
 
-Crypto trading ML research targeting OKX, BTC/ETH/SOL, 1-minute bars.
-Phase: research-first — validate signal with honest out-of-sample methodology before any production deployment.
+Research-first ML system for crypto trading on OKX (BTC/ETH/SOL, 1-minute bars).
+Goal: validate signal with honest out-of-sample methodology before any production deployment.
 
 **Repo:** `petrovichp/test_project` at `/Users/petrpogoraev/Documents/Projects/test_project`
 
@@ -24,239 +24,190 @@ taker_sell, taker_buy, diff_price`
 
 ETH and SOL meta parquets available at same path (`okx_ethusdt_...` / `okx_solusdt_...`).
 
-**OB encoding:** bins 0–199 are equal-width price buckets anchored at best bid/ask
-(bin 0 = closest to mid, bin 199 = furthest). Amounts normalized by `spot_ask_price`.
-`span_spot_price` / `span_perp_price` = dollar range covered by bins. Currently missing from baseline — must be added.
+**OB encoding:** 200 equal-width price bins anchored at best bid/ask (bin 0 = closest to mid).
+Amounts normalized by `spot_ask_price`. `span_spot_price` / `span_perp_price` = bid-ask spread
+(NOT OB depth range — true price-level features require adding depth span to collection pipeline).
+
+**Splits** — 50/25/25 sequential, no random shuffling:
+- Train: 70,902 rows — Jul→Oct 2025
+- Val: 35,451 rows — Oct→Dec 2025 (harder regime — includes Nov 2025 outage)
+- Test: 35,451 rows — Dec 2025→Apr 2026
+
+`models/splits.py`: `sequential(n, 0.50, 0.25)` and `walk_forward(ts, 90d, 30d, 30d)` → 6 folds
 
 ---
 
-## Infrastructure (already built)
+## Infrastructure
 
-| Module | What it does |
+| Module | Function |
 |---|---|
-| `data/loader.py` | `load_meta(ticker)` / `load(ticker)` — loads from parquet cache |
+| `data/loader.py` | `load_meta(ticker)` / `load(ticker)` — parquet cache |
 | `data/gaps.py` | `clean_mask(timestamps, max_lookback)` — flags gap-contaminated rows |
-| `models/splits.py` | `sequential(n, 0.50, 0.25)` and `walk_forward(ts, 90d, 30d, 30d)` → 6 folds |
-| `models/volatility.py` | Volatility research — run with `python3 -m models.volatility [ticker]` |
+| `models/splits.py` | Sequential and walk-forward splits |
+| `features/orderbook.py` | 93 OB features incl. True OFI, depth bands, wall detection |
+| `features/price.py` | 51 price/momentum features |
+| `features/volume.py` | 17 volume/taker features |
+| `features/market.py` | 30 OI, funding, calendar features |
+| `features/assembly.py` | Combines all → 191 features, applies gap mask, scales |
+| `models/volatility.py` | Vol models. Run: `python3 -m models.volatility btc` |
+| `models/direction.py` | LightGBM direction. Run: `python3 -m models.direction btc` |
+| `models/direction_dl.py` | CNN-LSTM + DeepLOB. Run: `python3 -m models.direction_dl btc cnn_lstm` |
+| `models/ensemble.py` | LightGBM + CNN-LSTM ensemble. Run: `python3 -m models.ensemble btc` |
+| `models/evaluate.py` | Confusion matrix comparison. Run: `python3 -m models.evaluate btc` |
+| `model_registry.json` | Central registry of all trained models with metrics |
 
-**Caching:** save all expensive intermediate results to `cache/` as `.parquet` or `.npy`. Always check cache before recomputing.
+**Caching:** expensive intermediates → `cache/` as `.parquet`, `.npy`, `.keras`, `.txt`. Always check cache before recomputing.
+
+**Model coding system:** `{ticker}_{model_type}_{target}_{horizon}`
+- `btc_lgbm_atr_30` — LightGBM, BTC, ATR, 30-bar horizon
+- `btc_cnn_dir_up_60` — CNN-LSTM, BTC, direction up, 60-bar horizon
+- `btc_ens_dir_dn_100` — Ensemble, BTC, direction down, 100-bar horizon
 
 ---
 
 ## Strict No-Leakage Rules
 
 - All features use only bars `[t - lookback, t]`. Never `shift(-n)` on features.
-- `shift(-n)` for label construction only, nothing else.
-- `StandardScaler` / any normalization: fit on train split only, transform val/test.
-- No `BatchNorm` over full dataset — use `LayerNorm` or `InstanceNorm` in DL models.
-- Cross-asset features (BTC → ETH/SOL): lag the predictor by 1+ bars.
-- Rolling windows: `min_periods=full_window` — NaN-fill early bars, exclude from samples.
+- `shift(-n)` for label construction only.
+- Normalization: fit scaler on train only, transform val/test.
+- No BatchNorm over full dataset — use LayerNorm or InstanceNorm in DL.
+- Cross-asset features: lag predictor by 1+ bars.
+- Rolling windows: `min_periods=full_window` — NaN early bars, exclude from samples.
 - Embargo: gap of `label_length` bars between train end and val/test start.
-- Walk-forward splits only. Never shuffle time-series data.
+- Walk-forward only. Never shuffle time-series.
 
 ---
 
-## Volatility Research (done — extend this)
+## Research Results
 
-`models/volatility.py` explores 3 target types × 5 horizons using LightGBM.
+### Volatility Models — done
 
-**Current results on BTC (val set, Spearman correlation):**
+LightGBM regressors. Targets: ATR ($) and realized vol (%). Horizons: 15, 30, 60, 100, 240 bars.
 
-| Target | H=15 | H=30 | H=60 | H=100 | H=240 |
-|---|---|---|---|---|---|
-| ATR | **0.727** | **0.724** | 0.692 | **0.704** | 0.591 |
-| Realized vol | 0.696 | 0.674 | 0.628 | 0.617 | 0.448 |
-| Price range | 0.614 | 0.554 | 0.493 | 0.445 | 0.265 |
+**Best results (Spearman correlation, test set):**
 
-**Key finding:** ATR is the most predictable target across all horizons. Short horizons (15–30 bars)
-are more predictable than long ones. Directional accuracy (top-tercile identification) reaches 78–79%
-for ATR at 15–30 bars.
-
-**Next steps for volatility research:**
-- Run walk-forward validation on the best combinations (ATR H=15, ATR H=30, realized_vol H=15)
-  to confirm signal is consistent across market regimes, not just one period
-- Add OB features (`span_spot`, `span_perp`, OB bucket imbalance, OB velocity) — currently not used
-- Try quantile regression instead of MSE regression: predicting the 75th/90th percentile of vol
-  is more useful than predicting the mean (better for TP/SL sizing)
-- Test on ETH and SOL — does the same feature set transfer across assets?
-- Multi-output model: predict all horizons simultaneously (shared encoder, separate output heads)
-- SHAP analysis: which features drive volatility prediction? Expected: current realized vol,
-  OI velocity, taker imbalance, spread BPS
-
----
-
-## Direction Prediction Research (to build)
-
-Build `features/` modules first, then train direction models.
-
-### Feature Engineering
-
-All features backward-looking only. Ablate — measure AUC contribution per group.
-
-**Orderbook** (`features/orderbook.py`):
-- Baseline buckets [0–50, 50–100, 100–200] amounts per side (spot + perp)
-- `span_spot` and `span_perp` as scalars
-- Per-bucket imbalance: `(bid - ask) / (bid + ask)` per bucket
-- OB velocity: diff of bucket amounts between consecutive snapshots
-- Cumulative depth curve: cumsum of bins from mid outward
-- Try finer bucketing [0–20, 20–50, 50–100, 100–200] and 1D conv over all 200 levels
-
-**Price & Momentum** (`features/price.py`):
-- Log returns at 1, 5, 15, 30, 60, 120, 240 bars
-- SMA, EMA at 5, 10, 20, 50, 100, 200 bars; close/SMA ratio
-- MACD (12/26/9), RSI (6, 14), ROC (5, 10, 20), Stochastic (5, 14)
-- Bollinger %B and band width (20 bars)
-- Rolling VWAP (60, 240, 1440 bars) and deviation from VWAP
-- Perp-spot basis bps, basis z-score (60, 240 bar window), basis momentum
-
-**Volatility** (`features/volatility.py`):
-- Rolling std at 5, 15, 30, 60, 240, 1440 bars
-- ATR (5, 14), Garman-Klass (10, 20, 60)
-- Vol of vol, vol ratio short/long, volatility regime bucket (3-class)
-- Use predicted volatility from `models/volatility.py` as a feature — the model's own
-  vol forecast is informative for direction (high predicted vol = larger expected moves)
-
-**Volume & Taker** (`features/volume.py`):
-- Volume z-score (20, 60 bars)
-- Taker imbalance at 1, 5, 15, 30 bars
-- Cumulative taker net (rolling sum buy - sell)
-- OBV (on-balance volume)
-- OFI (order flow imbalance): change in best bid/ask quantity between snapshots
-
-**Market & Derivatives** (`features/market.py`):
-- OI velocity (1, 5, 15, 60 bars), OI z-score (60, 240, 1440 bars)
-- Funding rate, rolling mean/std (last 3, 8, 24 settlements), funding momentum
-- OI-price divergence (leading indicator for squeeze/unwind)
-
-**Cross-Asset** (`features/cross_asset.py`):
-- BTC lag-1 return as feature for ETH/SOL
-- Rolling correlation BTC/ETH, BTC/SOL (60, 240, 1440 bars)
-- Relative strength ratio
-
-**Calendar** (inside `features/market.py`):
-- Hour and day-of-week as sin/cos pairs — never raw integers
-- Session flags: Asia (00–08 UTC), London (07–16 UTC), NY (13–21 UTC)
-
-**Regime** (`features/regime.py`):
-- ADX (14 bars): ranging / trending / strong trend bucket
-- Autocorrelation lag-1 of returns (20, 60 bars)
-- Amihud illiquidity: `abs(return) / dollar_volume`, rolled 20, 60, 240 bars
-
-### Label Construction
-
-```python
-# Price moves >threshold in next H bars — two binary targets
-Y_up   = (max(price[t+1:t+H+1]) / price[t] - 1) > threshold   # e.g. +0.8%
-Y_down = (min(price[t+1:t+H+1]) / price[t] - 1) < -threshold  # e.g. -0.8%
-```
-
-Also try risk-adjusted label: `raw_return / realized_vol` — normalises for regime.
-
-### Two-Stage Pipeline (final form)
-
-```
-Volatility model → predicted ATR
-        ↓
-Direction model (uses predicted ATR as a feature)
-        ↓
-Trade signal: direction × confidence × vol-adjusted size
-```
-
-The volatility prediction feeds into the direction model as a feature — high predicted ATR means
-larger expected moves, which helps calibrate the confidence threshold for entry.
-
----
-
-### Model Training Plan
-
-#### Volatility Models — predict *how much* price will move
-
-Used for position sizing and dynamic TP/SL.
-
-| Model | Target | Horizons | Status |
+| Model | Val Spearman | Test Spearman | Top-33% Precision (test) |
 |---|---|---|---|
-| LightGBM regressor | ATR | 15, 30, 60, 100 bars | Done — Spearman 0.70–0.73 |
-| LightGBM regressor | Realized vol | 15, 30, 60, 100 bars | Done — Spearman 0.62–0.70 |
-| LightGBM quantile (75th, 90th) | ATR | 15, 30 bars | Next — better for TP/SL sizing |
-| LightGBM + OB features | ATR | 15, 30 bars | Next — add span, imbalance, velocity |
-| Multi-output LightGBM | ATR all horizons | 15, 30, 60, 100 | Later — shared features, all horizons at once |
+| btc_lgbm_atr_30 | 0.627 | **0.801** | 0.644 |
+| btc_lgbm_rvol_30 | 0.579 | **0.800** | **0.921** |
+| btc_lgbm_atr_15 | 0.647 | 0.784 | 0.606 |
+| btc_lgbm_rvol_15 | 0.605 | 0.790 | **0.879** |
+| btc_lgbm_atr_60 | 0.582 | 0.764 | 0.662 |
+| btc_lgbm_atr_100 | 0.559 | 0.726 | 0.673 |
 
-#### Direction Models — predict *which way* price will move
+Walk-forward: **all 6 folds positive** (0.57–0.80). Signal is consistent across regimes.
 
-Binary signal: will price go up / down more than X% in the next H bars.
-**Do not build DL models until LightGBM confirms real signal on walk-forward.**
+**Top features:** `bb_width` (27–29%), `dow_sin` (7–9%), `hour_sin/cos` (6–9%), `session_ny` (2–4%), `vwap_dev_1440` / `vwap_1440` / `obv_1440` (3–4% each), `oi_z_1440` / `fund_mean_1440` (1.5% each).
 
-**Stage 1 — Tabular baselines**
+**bb_width removal experiment:** dropping it costs 0.03–0.07 Spearman. Kept — it's legitimate volatility clustering, not leakage. Strategy rule: if bb_width > 95th pct, use directly; else use model output.
 
-| Model | Input | Notes |
-|---|---|---|
-| LightGBM | Flat ~200–300 features per bar | Primary baseline. SHAP for leakage audit. |
-| CatBoost | Same + calendar as native categoricals | Compare AUC vs LightGBM |
+**Quantile regression (atr_15, alpha=0.90):** coverage=0.880 on test — well calibrated.
 
-Params: `num_leaves=64`, `min_data_in_leaf=100`, `feature_fraction=0.7`, early stopping on time-ordered val.
-Gate to Stage 2: walk-forward AUC > 0.52 on 5+ of 6 folds.
+---
 
-**Stage 2 — Deep learning**
+### Direction Models — done
 
-| Model | Input shape | What it captures |
-|---|---|---|
-| Multi-input DNN + LSTM branches | `(batch, lookback, n_features)` per group | Temporal structure per feature group |
-| CNN-LSTM hybrid | `(batch, 60, ~25 features)` | Local patterns → temporal evolution. Best DL baseline for 1-min crypto. |
-| DeepLOB variant | `(batch, 100, 40 OB levels)` | OB spatial + temporal structure. Top 20–50 bins only. |
+Labels: `Y_up_H = max(price[t+1:t+H]) / price[t] - 1 > 0.8%`, symmetric for down. H=60 and 100.
 
-CNN-LSTM: `CausalConv1D(64, kernel=5, padding='causal')` → `GRU(128)` → Dense → sigmoid.
-DeepLOB: Conv2D blocks → Inception module → LSTM(64) → sigmoid.
+**AUC comparison (test set):**
 
-**Stage 3 — Ensemble**
+| Label | LightGBM | CNN-LSTM | **Ensemble** |
+|---|---|---|---|
+| down_100 | 0.703 | 0.720 | **0.725** |
+| up_100 | 0.646 | 0.702 | **0.714** |
+| up_60 | 0.640 | 0.699 | **0.704** |
+| down_60 | 0.670 | 0.667 | **0.669** |
 
-| Model | Composition | Weights |
-|---|---|---|
-| Weighted average | LightGBM + CatBoost + CNN-LSTM + DeepLOB | From walk-forward Sharpe |
+Walk-forward up_60: **6/6 folds > 0.52**, mean AUC=0.66. Gate to DL stage: PASS.
 
-Evaluate: does ensemble consistently beat best single model across all 6 folds?
+**Top direction features:** `vwap_1440`, `bb_width`, `fund_mom_480/1440`, `obv_1440`, `oi_z_1440`, `hour_sin/cos`, `taker_net_60`, `ofi_perp_10`. Funding rate momentum and VWAP dominate.
 
-### Evaluation Protocol (apply to every model trained)
+**Confusion matrices (test, optimal F1 threshold):**
 
-Every model goes through the same three-step evaluation before any conclusions are drawn.
-Results are printed and saved to `cache/{ticker}_{model_name}_eval.parquet`.
+| Label | Model | Precision | Recall | F1 | Signal rate |
+|---|---|---|---|---|---|
+| down_100 | CNN-LSTM (t=0.64) | **0.331** | 0.540 | 0.411 | 37% |
+| down_100 | Ensemble (t=0.35) | 0.335 | 0.517 | 0.407 | 30% |
+| up_100 | Ensemble (t=0.35) | 0.268 | 0.607 | 0.372 | 36% |
+| down_60 | CNN-LSTM (t=0.24) | 0.260 | 0.307 | 0.281 | 19% |
 
-**Step 1 — Train**
-- Train on train split (50% of data, Jul 2025 → Dec 2025)
-- Early stopping evaluated on val split — never on test
-- Save model to `cache/`
+**Key findings:**
+- LightGBM fires near-zero positives at any useful threshold — not tradeable alone
+- CNN-LSTM fires aggressively at low thresholds — too many false positives
+- Ensemble balances precision/recall best — only tradeable model
+- Precision ≥ 0.70 unachievable at useful recall — scores are compressed, **calibration needed**
+- Positive rate grows train→val→test (1.9%→6.6%→12.6%) — market became more directional, not leakage
 
-**Step 2 — Val analysis**
-- Evaluate on val split (25%, Dec 2025 → Feb 2026)
-- Report: AUC / Spearman / RMSE (depending on task), feature importance (SHAP for LightGBM)
-- Plot: prediction distribution, calibration curve, performance over time
-- Decision point: is val performance above the signal threshold?
-  - Direction: AUC > 0.52
-  - Volatility: Spearman > 0.40
-  - If below threshold → diagnose (leakage? poor features? wrong label?) before touching test
+**DeepLOB — dropped:** test AUC 0.39–0.55, two labels below 0.50. Raw OB bins without price/volume context carry insufficient directional signal at this data scale and architecture size.
 
-**Step 3 — Test analysis (run once, after val passes)**
-- Evaluate on test split (25%, Feb 2026 → Apr 2026)
-- Report same metrics as val
-- Compare val vs test: large gap = overfitting to val period, investigate
-- This is the honest number — do not re-tune after seeing test results
+**CNN-LSTM architecture:** `CausalConv1D(32, k=3)` → `GRU(64)` → `Dense(32)` → sigmoid. SEQ_LEN=30, 30 input features including new OFI and depth-band features.
 
-**Analysis checklist after each model:**
-- [ ] Are val and test metrics consistent? (gap < 10% relative)
-- [ ] Does SHAP show sensible features driving predictions? (flag suspiciously dominant features)
-- [ ] Is prediction distribution well-calibrated? (not collapsed to 0.5)
-- [ ] Does performance degrade in specific date ranges? (check Nov 2025 outage period)
-- [ ] Walk-forward: is signal consistent across all 6 folds or concentrated in 1–2?
+---
 
-**Walk-forward gate (direction models only)**
-After sequential train/val/test passes: run 6-fold walk-forward.
-Gate to next stage: AUC > 0.52 on 5+ of 6 folds.
-If gate fails: go back to features, not to a more complex model.
+### Architecture Decisions
+
+| Decision | Reason |
+|---|---|
+| Drop random splits | Leakage — original notebook AUC inflated by up to 0.15 |
+| Drop DeepLOB | Severe overfitting, test AUC <0.50 on 2 of 4 labels |
+| Keep bb_width | Legitimate volatility clustering, not leakage |
+| Ensemble over single model | Consistently +0.002–0.012 AUC over best individual model |
+| Val underperforms test | Nov 2025 outage = harder regime, not a methodology bug |
+| OFI from bin diffs | Stronger signal than imbalance proxy — direction models improved |
+
+---
+
+## Model Training Plan — Next Steps
+
+### Pending (priority order)
+
+**1. Probability calibration (highest priority)**
+- Problem: all model scores compressed — precision ≥ 0.70 unachievable at any recall
+- Fix: apply Platt scaling (logistic regression on val probabilities) or isotonic regression
+- Target: `down_100` CNN-LSTM at precision ≥ 0.70 after calibration
+- Implementation: `models/calibration.py` — wrap existing models with sklearn `CalibratedClassifierCV`
+
+**2. Two-stage pipeline**
+- Feed predicted ATR (from volatility model) as a feature into direction models
+- Expected: helps direction model calibrate its confidence during high-vol periods
+- Implementation: add `btc_lgbm_atr_30` predictions as a feature column in `features/assembly.py`
+
+**3. Cross-asset (ETH and SOL)**
+- Run same volatility and direction pipeline on ETH and SOL
+- Use BTC lag-1 return as cross-asset feature for ETH/SOL models
+- Check: does signal transfer across assets with same feature set?
+
+**4. Backtest**
+- Plug ensemble signals into `backtest/engine.py`
+- OKX fees: taker 0.08%, maker 0.02%
+- Execution lag: 1-bar delay
+- Evaluate: Sharpe ratio, max drawdown, profit factor
+
+**5. OB depth span (data collection improvement)**
+- Currently `span_spot_price` = bid-ask spread (not OB depth range)
+- Add actual dollar range covered by 200 bins to collection pipeline
+- Unlocks true price-level features: "liquidity within ±0.5% of mid"
+
+**6. DeepLOB (revisit with more data)**
+- Current dataset too small and noisy for raw OB sequence learning
+- Revisit when ETH/SOL data is added (3× more samples) or with GPU training
+
+---
+
+## Evaluation Protocol (apply to every new model)
+
+1. **Train** on train split, early stopping evaluated on val only
+2. **Val analysis** — AUC/Spearman, confusion matrix, feature importance. Gate: AUC > 0.52 / Spearman > 0.40
+3. **Test** — run once only after val passes. Never re-tune after seeing test.
+4. **Walk-forward** — 6 folds. Signal confirmed if 5+ of 6 folds pass gate.
+5. **Calibration check** — are predicted probabilities well-spread or compressed?
 
 ---
 
 ## Code Style
 
 - No docstring walls. Comments only for non-obvious decisions.
-- No random shuffling of time-series data anywhere.
-- Parquet cache for everything expensive.
+- No random shuffling anywhere.
+- Cache everything expensive in `cache/`.
 - Run modules directly: `python3 -m models.volatility btc`
+- Model codes: `{ticker}_{model_type}_{target}_{horizon}`
