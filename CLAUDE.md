@@ -38,6 +38,10 @@ Loader: `data/loader.py` — `load_meta(ticker)` or `load(ticker, include_ob=Tru
 | `data/gaps.py` | `clean_mask(timestamps, max_lookback)` — flags gap-contaminated rows (9.45% missing) |
 | `models/splits.py` | `sequential(n, 0.50, 0.25)` and `walk_forward(ts, 90, 30, 30)` → 6 folds |
 | `models/volatility.py` | Volatility research. Run: `python3 -m models.volatility btc` |
+| `models/direction.py` | LightGBM direction model. Run: `python3 -m models.direction btc` |
+| `models/direction_dl.py` | CNN-LSTM. Run: `python3 -m models.direction_dl btc cnn_lstm` |
+| `models/ensemble.py` | LightGBM + CNN-LSTM weighted ensemble. Run: `python3 -m models.ensemble btc` |
+| `models/evaluate.py` | Confusion matrix comparison across all models. Run: `python3 -m models.evaluate btc` |
 
 Caching rule: save expensive intermediates to `cache/` as `.parquet` or `.npy`. Always check cache before recomputing.
 
@@ -65,48 +69,109 @@ Cached to `cache/btc_features_*.parquet`. Load via `features/assembly.py`.
 
 Splits after gap masking: Train 70,902 (Jul→Oct 2025) / Val 35,451 (Oct→Dec 2025) / Test 35,451 (Dec 2025→Apr 2026).
 
+---
+
 ### Volatility model — done (`models/volatility.py`)
-Uses assembled features. Results cached at `cache/btc_volatility_eval.parquet`.
+Targets: `atr_H` (avg true range over next H bars, in $) and `realized_vol_H` (std of log returns, %).
+Horizons tested: 15, 30, 60, 100, 240. Results cached at `cache/btc_volatility_eval.parquet`.
 
-| Target | Val Spearman | Test Spearman |
-|---|---|---|
-| ATR H=15 | 0.647 | **0.784** |
-| ATR H=30 | 0.627 | **0.801** |
-| Realized vol H=15 | 0.605 | 0.790 |
+**Best results (Spearman correlation):**
 
-Walk-forward atr_15: all 6 folds positive (0.57–0.80). Top features: `bb_width`, `dow_sin`, `hour_sin`, `vwap_dev_1440`, `oi_z_1440`.
-Val underperforms test — val period (Oct–Dec 2025) covers the Nov outage, a harder regime.
-Quantile regression (75/90th pct) runs but coverage undershoots on val, corrects on test.
-
-### Direction model — LightGBM done (`models/direction.py`)
-Results cached at `cache/btc_direction_eval.parquet`.
-
-| Label | Val AUC | Test AUC | Gap |
+| Target | Val | Test | Walk-forward (6 folds) |
 |---|---|---|---|
-| down_60 | 0.684 | **0.698** | ✓ 0.015 |
-| up_60 | 0.599 | 0.689 | ⚠ 0.091 |
-| down_100 | 0.592 | 0.675 | ⚠ 0.083 |
-| up_100 | 0.578 | 0.655 | ⚠ 0.077 |
+| atr_15 | 0.647 | **0.784** | 0.57–0.80, all positive |
+| atr_30 | 0.627 | **0.801** | — |
+| realized_vol_15 | 0.605 | **0.790** | — |
+| atr_60 | 0.582 | 0.764 | — |
+| atr_100 | 0.559 | 0.726 | — |
 
-Walk-forward up_60: **6/6 folds > 0.52**, mean AUC 0.66. **Gate to DL stage: PASS.**
-Top features: `vwap_1440`, `bb_width`, `fund_mom_480/1440`, `obv_1440`, `oi_z_1440`, `hour_sin/cos`, `taker_net_60`.
-down_60 is the most stable model (smallest val/test gap).
+Val underperforms test — val period (Oct–Dec 2025) includes the Nov outage (harder regime).
 
-### DL models — next
-CNN-LSTM hybrid → DeepLOB → Ensemble.
+**Confusion matrix (top-33% high-vol detection, atr_15, test):**
+- Precision=0.606, Recall=0.690, F1=0.646 — usable as a vol filter for the strategy layer
+- `realized_vol_15` hits Precision=0.879 on test (best for high-confidence vol filtering)
+
+**Top features (consistent across all targets):**
+1. `bb_width` — 27–29% of gain (current volatility → future volatility, valid clustering effect)
+2. `dow_sin` — 7–9% (weekly seasonality)
+3. `hour_sin` / `hour_cos` — 6–9% (intraday session patterns)
+4. `session_ny` — 2–4% (NY session 13–21 UTC is highest-vol window)
+5. `vwap_dev_1440` / `vwap_1440` / `obv_1440` — 3–4% each (trend regime)
+6. `oi_z_1440` / `fund_mean_1440` — 1.5% each (derivatives positioning)
+7. OB features and short-term taker flow: near zero — vol is regime+calendar driven, not microstructure
+
+**`bb_width` removal experiment (horizons 15, 30, 60, 100):**
+- Removing `bb_width` + `bb_pct_b` drops test Spearman by 0.028–0.068
+- Remaining signal: 0.67–0.76 Spearman — still strong from calendar + trend + derivatives
+- Decision: keep `bb_width` (it's legitimate volatility clustering, not leakage)
+- Strategy rule: if `bb_width` > 95th pct on its own, use it directly; else use model output
+
+**Quantile regression (atr_15, alpha=0.90, test):** Coverage=0.880 (target=0.90) — well calibrated on test.
+
+---
+
+### Direction model — done (`models/direction.py`, `models/direction_dl.py`, `models/ensemble.py`)
+Labels: `Y_up_H = max(price[t+1:t+H]) / price[t] - 1 > 0.8%`, symmetric for `Y_down_H`.
+Horizons: 60 and 100 bars. Results cached at `cache/btc_direction_eval.parquet`, `cache/btc_ensemble_eval.parquet`.
+
+**AUC comparison (test set):**
+
+| Label | LightGBM | CNN-LSTM | **Ensemble** |
+|---|---|---|---|
+| down_60 | 0.698 | 0.732 | **0.736** |
+| up_60 | 0.689 | 0.701 | **0.711** |
+| down_100 | 0.675 | 0.683 | **0.702** |
+| up_100 | 0.655 | 0.647 | **0.656** |
+
+Walk-forward up_60: **6/6 folds > 0.52**, mean AUC=0.66. Gate to DL stage: PASS.
+
+**Top direction features:** `vwap_1440`, `bb_width`, `fund_mom_480/1440`, `obv_1440`, `oi_z_1440`, `hour_sin/cos`, `taker_net_60`. Funding rate momentum and VWAP dominate.
+
+**Confusion matrices (test, optimal F1 threshold):**
+
+| Label | Model | Precision | Recall | F1 | Signal rate |
+|---|---|---|---|---|---|
+| down_60 | Ensemble | 0.258 | 0.389 | 0.310 | 19% |
+| up_60 | Ensemble | 0.258 | 0.313 | 0.283 | 12% |
+| down_100 | Ensemble | 0.308 | 0.592 | 0.405 | 37% |
+| down_60 | CNN-LSTM | 0.236 | 0.515 | 0.324 | 28% |
+
+**Key findings from confusion matrices:**
+- LightGBM alone fires almost nothing at H=60 (0 predicted positives) — not tradeable alone
+- CNN-LSTM fires too aggressively (80% signal rate for up_60) — too many false positives
+- Ensemble is the only tradeable model — balances precision and recall
+- Precision ≥ 0.70 threshold unachievable at any useful recall — model scores are compressed, calibration needed
+- Positive rate grows from train→val→test (1.9% → 6.6% → 12.6%) — market became more directional, not leakage
+
+**DeepLOB:** Optimised (20 OB levels, scaled matrix cached to `cache/btc_deeplob_ob20_scaled.npz`). Not yet trained — run: `python3 -m models.direction_dl btc deeplob`
+
+---
+
+### Pending tasks
+- Probability calibration (Platt scaling / isotonic) — fix compressed probability scores so precision≥0.70 becomes achievable
+- Cross-asset: run vol + direction models on ETH and SOL
+- Two-stage pipeline: feed predicted ATR as feature into direction model
+- DeepLOB training (infrastructure ready, run when needed)
+- Backtest: plug ensemble signals into `backtest/engine.py` with OKX fees (taker 0.08%, maker 0.02%)
+
+---
 
 ## Project structure
 
 ```
 data/          loader.py, gaps.py
 features/      orderbook.py, price.py, volume.py, market.py, assembly.py
-models/        splits.py, volatility.py, direction.py  ← LightGBM done
-               direction_dl.py  ← to build (CNN-LSTM, DeepLOB)
-strategy/      agent.py, genetic.py  ← empty stubs
-backtest/      engine.py, costs.py   ← empty stubs
-validation/    walkforward.py        ← empty stub
+models/        splits.py
+               volatility.py       ← done, confusion matrix included
+               direction.py        ← LightGBM done
+               direction_dl.py     ← CNN-LSTM done, DeepLOB ready to run
+               ensemble.py         ← LightGBM + CNN-LSTM weighted ensemble done
+               evaluate.py         ← confusion matrix comparison across all models
+strategy/      agent.py, genetic.py          ← empty stubs
+backtest/      engine.py, costs.py           ← empty stubs
+validation/    walkforward.py                ← empty stub
 cache/         parquet and npy files (gitignored)
-RESEARCH_PROMPT.md  full research agenda
+RESEARCH_PROMPT.md   full research agenda with feature/model details
 ```
 
 ## Code style
