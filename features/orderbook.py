@@ -77,8 +77,36 @@ def compute(ticker: str, force: bool = False) -> pd.DataFrame:
                 feats[f"ob_vel_{inst}_{side}_{lo}_{hi}"] = feats[key].diff(1)
 
     # ── 4. span scalars ───────────────────────────────────────────────────────
-    feats["span_spot"] = meta["span_spot_price"].values
+    feats["span_spot"] = meta["span_spot_price"].values   # bid-ask spread (%)
     feats["span_perp"] = meta["span_perp_price"].values
+
+    # ── 4b. OB depth span (price-level features) ──────────────────────────────
+    # ob_depth_span_spot/perp = dollar range covered by 200 bins.
+    # Added to collection pipeline — only present in data collected after the fix.
+    # When available: bin_price_offset = (bin_idx / 200) * ob_depth_span
+    # Enables "liquidity within ±0.5% of mid" and exact wall price features.
+    for col, name in [("ob_depth_span_spot", "depth_span_spot"),
+                      ("ob_depth_span_perp", "depth_span_perp")]:
+        if col in meta.columns:
+            feats[name] = meta[col].values
+            # Price-level features only computable when depth span is available
+            price_col = "spot_ask_price" if "spot" in col else "perp_ask_price"
+            mid = meta[price_col].values
+            span_dollar = meta[col].values
+            for inst, side_cols in [("spot", "spot"), ("perp", "perp")]:
+                if inst not in col:
+                    continue
+                # Liquidity within ±0.5% and ±1% of mid (bin cutoffs from span)
+                for pct in [0.005, 0.01]:
+                    cutoff = np.clip(
+                        (pct * mid / (span_dollar + 1e-12) * 200).astype(int),
+                        1, 199
+                    )
+                    bid_near = np.array([
+                        ob[[f"{inst}_bids_amount_{i}" for i in range(int(c))]].iloc[row].sum()
+                        for row, c in enumerate(cutoff)
+                    ]) if len(cutoff) > 0 else np.zeros(len(meta))
+                    feats[f"liq_bid_{inst}_{int(pct*1000)}bps"] = bid_near
 
     # ── 5 & 6. True OFI and rolling OFI ──────────────────────────────────────
     # OFI = Δ(near-bid-qty) - Δ(near-ask-qty)
