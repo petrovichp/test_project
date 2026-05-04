@@ -279,32 +279,55 @@ def run_deeplob(ticker: str):
     fmt  = lambda ts: datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
     rows = []
 
+    def _make_tf_dataset(ob_chunk: np.ndarray, y_chunk: np.ndarray,
+                         seq_len: int, batch: int = 256, shuffle: bool = False):
+        """Generator-based tf.data pipeline — never materialises all sequences in RAM."""
+        valid_idx = np.array([i for i in range(seq_len, len(ob_chunk))
+                              if not np.isnan(y_chunk[i])])
+        if len(valid_idx) == 0:
+            return None, np.empty(0)
+
+        ob_levels_x4 = ob_chunk.shape[1] * ob_chunk.shape[2]   # OB_LEVELS * 4
+
+        def gen():
+            for i in valid_idx:
+                x = ob_chunk[i - seq_len:i].reshape(seq_len, ob_levels_x4, 1)
+                yield x.astype(np.float32), np.float32(y_chunk[i])
+
+        sig = (
+            tf.TensorSpec(shape=(seq_len, ob_levels_x4, 1), dtype=tf.float32),
+            tf.TensorSpec(shape=(),                          dtype=tf.float32),
+        )
+        ds = tf.data.Dataset.from_generator(gen, output_signature=sig)
+        if shuffle:
+            ds = ds.shuffle(buffer_size=min(5000, len(valid_idx)))
+        return ds.batch(batch).prefetch(tf.data.AUTOTUNE), y_chunk[valid_idx]
+
+    def _predict_deeplob(model, ob_chunk, y_chunk, seq_len, batch=512):
+        valid_idx = np.array([i for i in range(seq_len, len(ob_chunk))
+                              if not np.isnan(y_chunk[i])])
+        ob_levels_x4 = ob_chunk.shape[1] * ob_chunk.shape[2]
+        preds = []
+        for start in range(0, len(valid_idx), batch):
+            idxs = valid_idx[start:start + batch]
+            xs   = np.stack([ob_chunk[i - seq_len:i].reshape(seq_len, ob_levels_x4, 1)
+                             for i in idxs]).astype(np.float32)
+            preds.append(model.predict(xs, verbose=0).flatten())
+        return np.concatenate(preds), y_chunk[valid_idx]
+
     for H in HORIZONS:
         for direction in ["up", "down"]:
             col = f"{direction}_{H}"
             print(f"\n── {col} ──────────────────────────────────────────")
 
-            def _lbl(idxs):
-                return all_lbl[col][idxs]
+            y_tr = all_lbl[col][tr_idx]
+            y_v  = all_lbl[col][val_idx]
+            y_te = all_lbl[col][te_idx]
 
-            y_tr = _lbl(tr_idx)
-            y_v  = _lbl(val_idx)
-            y_te = _lbl(te_idx)
+            ds_tr, ys_tr = _make_tf_dataset(ob_tr, y_tr, SEQ_LEN, shuffle=True)
+            ds_v,  ys_v  = _make_tf_dataset(ob_v,  y_v,  SEQ_LEN)
 
-            def _seqs(ob_chunk, y_chunk):
-                n = len(ob_chunk)
-                idx = [i for i in range(SEQ_LEN, n) if not np.isnan(y_chunk[i])]
-                if not idx:
-                    return np.empty((0, SEQ_LEN, OB_LEVELS * 4, 1)), np.empty(0)
-                X_s = np.stack([ob_chunk[i - SEQ_LEN:i].reshape(SEQ_LEN, OB_LEVELS * 4)
-                                for i in idx])[..., np.newaxis]
-                return X_s, y_chunk[np.array(idx)]
-
-            Xs_tr, ys_tr = _seqs(ob_tr, y_tr)
-            Xs_v,  ys_v  = _seqs(ob_v,  y_v)
-            Xs_te, ys_te = _seqs(ob_te, y_te)
-
-            if len(ys_tr) < 200:
+            if ds_tr is None or len(ys_tr) < 200:
                 print("  Too few samples, skipping.")
                 continue
 
@@ -312,10 +335,18 @@ def run_deeplob(ticker: str):
             print(f"  Train: {len(ys_tr):,} seqs  positives={pos:.1%}")
 
             model = build_deeplob(SEQ_LEN, OB_LEVELS)
-            _fit(model, Xs_tr, ys_tr, Xs_v, ys_v)
+            cw    = {0: 1.0, 1: float((1 - pos) / (pos + 1e-9))}
+            cb    = [tf.keras.callbacks.EarlyStopping(
+                        monitor="val_auc", patience=5,
+                        restore_best_weights=True, mode="max")]
+            model.fit(ds_tr, validation_data=ds_v,
+                      epochs=20, callbacks=cb, verbose=0,
+                      class_weight=cw)
 
-            auc_val  = _auc(ys_v,  model.predict(Xs_v,  verbose=0).flatten())
-            auc_test = _auc(ys_te, model.predict(Xs_te, verbose=0).flatten())
+            prob_val,  y_val_true  = _predict_deeplob(model, ob_v,  y_v,  SEQ_LEN)
+            prob_test, y_test_true = _predict_deeplob(model, ob_te, y_te, SEQ_LEN)
+            auc_val  = _auc(y_val_true,  prob_val)
+            auc_test = _auc(y_test_true, prob_test)
             gap = abs(auc_val - auc_test)
 
             print(f"  VAL   AUC={auc_val:.4f}")
