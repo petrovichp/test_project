@@ -1,0 +1,68 @@
+{
+  "btc_lgbm_atr_30": {
+    "ticker": "btc",
+    "model_type": "lgbm",
+    "target": "atr",
+    "horizon": 30,
+    "val_spearman": 0.627,
+    "test_spearman": 0.801,
+    "val_dir_acc": 0.756,
+    "test_dir_acc": 0.824,
+    "model_file": "btc_lgbm_atr_30.txt"
+  },
+  "btc_lgbm_atr_60": {
+    "ticker": "btc",
+    "model_type": "lgbm",
+    "target": "atr",
+    "horizon": 60,
+    "val_spearman": 0.582,
+    "test_spearman": 0.764,
+    "val_dir_acc": 0.736,
+    "test_dir_acc": 0.813,
+    "model_file": "btc_lgbm_atr_60.txt"
+  },
+  "btc_lgbm_atr_100": {
+    "ticker": "btc",
+    "model_type": "lgbm",
+    "target": "atr",
+    "horizon": 100,
+    "val_spearman": 0.559,
+    "test_spearman": 0.726,
+    "val_dir_acc": 0.733,
+    "test_dir_acc": 0.787,
+    "model_file": "btc_lgbm_atr_100.txt"
+  },
+  "btc_lgbm_rvol_30": {
+    "ticker": "btc",
+    "model_type": "lgbm",
+    "target": "rvol",
+    "horizon": 30,
+    "val_spearman": 0.579,
+    "test_spearman": 0.8,
+    "val_dir_acc": 0.749,
+    "test_dir_acc": 0.772,
+    "model_file": "btc_lgbm_rvol_30.txt"
+  },
+  "btc_lgbm_rvol_60": {
+    "ticker": "btc",
+    "model_type": "lgbm",
+    "target": "rvol",
+    "horizon": 60,
+    "val_spearman": 0.488,
+    "test_spearman": 0.753,
+    "val_dir_acc": 0.721,
+    "test_dir_acc": 0.72,
+    "model_file": "btc_lgbm_rvol_60.txt"
+  },
+  "btc_lgbm_rvol_100": {
+    "ticker": "btc",
+    "model_type": "lgbm",
+    "target": "rvol",
+    "horizon": 100,
+    "val_spearman": 0.427,
+    "test_spearman": 0.72,
+    "val_dir_acc": 0.707,
+    "test_dir_acc": 0.702,
+    "model_file": "btc_lgbm_rvol_100.txt"
+  }
+}
