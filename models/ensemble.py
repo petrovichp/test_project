@@ -1,8 +1,13 @@
 """
-Ensemble — weighted average of LightGBM + CNN-LSTM predictions.
+Ensemble — weighted average of LightGBM + CNN-LSTM.
 
-Weights are derived from val AUC per label so the better model on val
-contributes more. Evaluates on val and test, compares to each individual model.
+Loads cached CNN-LSTM models (.keras files).
+Trains LightGBM fresh (fast, ~10s per label) with the full 191-feature set.
+Weights derived from val AUC per label.
+
+Prints confusion matrices for val and test at:
+  - optimal F1 threshold (set on val)
+  - high-precision threshold (precision >= 0.60 on val)
 
 Run: python3 -m models.ensemble [ticker]
 """
@@ -11,11 +16,11 @@ import numpy as np
 import pandas as pd
 import lightgbm as lgb
 import tensorflow as tf
-from tensorflow.keras import layers, Input, Model
-from sklearn.metrics import roc_auc_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import (roc_auc_score, precision_score, recall_score,
+                             f1_score, confusion_matrix)
 from pathlib import Path
 from datetime import datetime
+import json
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -25,10 +30,11 @@ from models.splits import sequential
 from features.assembly import assemble
 from models.direction_dl import (
     SEQ_FEATURES, SEQ_LEN, HORIZONS, THRESHOLD,
-    _compute_labels, _build_sequences, build_cnn_lstm, _fit, _auc
+    _compute_labels, _build_sequences, _auc,
 )
 
 CACHE_DIR = Path(__file__).parent.parent / "cache"
+REGISTRY  = Path(__file__).parent.parent / "model_registry.json"
 
 _LGB_PARAMS = {
     "objective": "binary", "metric": "auc", "boosting_type": "gbdt",
@@ -37,6 +43,8 @@ _LGB_PARAMS = {
     "verbosity": -1,
 }
 
+
+# ── helpers ───────────────────────────────────────────────────────────────────
 
 def _train_lgbm(X_tr, y_tr, X_val, y_val):
     ds_tr  = lgb.Dataset(X_tr,  label=y_tr)
@@ -48,10 +56,87 @@ def _train_lgbm(X_tr, y_tr, X_val, y_val):
     )
 
 
+def _best_threshold(y_true, y_prob, metric="f1"):
+    best_t, best_s = 0.5, -1
+    for t in np.arange(0.05, 0.95, 0.01):
+        p = (y_prob >= t).astype(int)
+        if p.sum() == 0:
+            continue
+        s = f1_score(y_true, p, zero_division=0)
+        if s > best_s:
+            best_s, best_t = s, t
+    return best_t
+
+
+def _prec_threshold(y_true, y_prob, min_prec=0.60):
+    for t in np.arange(0.95, 0.04, -0.01):
+        p = (y_prob >= t).astype(int)
+        if p.sum() == 0:
+            continue
+        if precision_score(y_true, p, zero_division=0) >= min_prec:
+            return t
+    return 0.90
+
+
+def _cm_block(y_true, y_prob, t):
+    p    = (y_prob >= t).astype(int)
+    tn, fp, fn, tp = confusion_matrix(y_true, p, labels=[0, 1]).ravel()
+    prec = precision_score(y_true, p, zero_division=0)
+    rec  = recall_score(y_true, p, zero_division=0)
+    f1   = f1_score(y_true, p, zero_division=0)
+    auc  = _auc(y_true, y_prob)
+    return dict(tn=int(tn), fp=int(fp), fn=int(fn), tp=int(tp),
+                prec=prec, rec=rec, f1=f1, auc=auc,
+                n_pos=int(p.sum()), threshold=t)
+
+
+def _print_cm(label, split, t_label, models_data: dict):
+    names  = list(models_data.keys())
+    col_w  = 24
+    print(f"\n  {'─'*72}")
+    print(f"  {label}  |  {split.upper()}  |  {t_label}")
+    print(f"  {'─'*72}")
+    print(f"  {'':20}", end="")
+    for n in names:
+        print(f"  {n:>{col_w}}", end="")
+    print()
+    print(f"  {'':20}", end="")
+    for n in names:
+        t = models_data[n]["threshold"]
+        print(f"  {'t='+f'{t:.2f}':>{col_w}}", end="")
+    print()
+
+    for row_label, neg_k, pos_k in [("Actual NEG", "tn", "fp"),
+                                     ("Actual POS", "fn", "tp")]:
+        print(f"  {row_label:<20}", end="")
+        for n in names:
+            d = models_data[n]
+            cell = (f"TN={d['tn']:,}  FP={d['fp']:,}"
+                    if neg_k == "tn" else
+                    f"FN={d['fn']:,}  TP={d['tp']:,}")
+            print(f"  {cell:>{col_w}}", end="")
+        print()
+
+    for m_label, key, fmt in [
+        ("AUC",       "auc",  ".4f"),
+        ("Precision", "prec", ".3f"),
+        ("Recall",    "rec",  ".3f"),
+        ("F1",        "f1",   ".3f"),
+        ("Pred pos",  "n_pos", ",d"),
+    ]:
+        print(f"  {m_label:<20}", end="")
+        for n in names:
+            v = models_data[n][key]
+            print(f"  {format(v, fmt):>{col_w}}", end="")
+        print()
+
+
+# ── main ──────────────────────────────────────────────────────────────────────
+
 def run(ticker: str = "btc"):
-    print(f"\n{'='*60}")
-    print(f"  ENSEMBLE (LightGBM + CNN-LSTM) — {ticker.upper()}")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*72}")
+    print(f"  ENSEMBLE — LightGBM + CNN-LSTM  ({ticker.upper()})")
+    print(f"{'='*72}\n")
 
     X_train, X_val, X_test, feat_cols, ts_train, ts_val, ts_test = assemble(ticker)
 
@@ -62,18 +147,20 @@ def run(ticker: str = "btc"):
     fmt     = lambda ts: datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
 
     # CNN-LSTM feature subset
-    sel_idx = [feat_cols.index(f) for f in SEQ_FEATURES if f in feat_cols]
+    sel_idx  = [feat_cols.index(f) for f in SEQ_FEATURES if f in feat_cols]
     X_tr_seq = X_train[:, sel_idx]
     X_v_seq  = X_val[:,   sel_idx]
     X_te_seq = X_test[:,  sel_idx]
-    n_feat   = X_tr_seq.shape[1]
 
+    reg  = json.loads(REGISTRY.read_text()) if REGISTRY.exists() else {}
     rows = []
 
     for H in HORIZONS:
         for direction in ["up", "down"]:
             col = f"{direction}_{H}"
-            print(f"\n── {col} ────────────────────────────────────────────────")
+            print(f"\n{'='*72}")
+            print(f"  Label: {col}  (threshold={THRESHOLD*100:.1f}%,  H={H} bars)")
+            print(f"{'='*72}")
 
             def _lbl(ts_arr):
                 return all_lbl[col][np.array([ts_map[t] for t in ts_arr])]
@@ -82,100 +169,120 @@ def run(ticker: str = "btc"):
             y_v  = _lbl(ts_val);    ok_val = ~np.isnan(y_v)
             y_te = _lbl(ts_test);   ok_te  = ~np.isnan(y_te)
 
+            pos_tr = y_tr[ok_tr].mean()
+            print(f"\n  Class balance — train {pos_tr:.1%} | "
+                  f"val {y_v[ok_val].mean():.1%} | "
+                  f"test {y_te[ok_te].mean():.1%}")
+
             # ── LightGBM ──────────────────────────────────────────────────────
+            print(f"\n  Training LightGBM ...")
             lgbm = _train_lgbm(X_train[ok_tr], y_tr[ok_tr],
                                X_val[ok_val],  y_v[ok_val])
-            prob_lgbm_val  = lgbm.predict(X_val[ok_val])
-            prob_lgbm_test = lgbm.predict(X_test[ok_te])
+            p_lgbm_v  = lgbm.predict(X_val[ok_val])
+            p_lgbm_te = lgbm.predict(X_test[ok_te])
+            auc_lgbm_v  = _auc(y_v[ok_val],  p_lgbm_v)
+            auc_lgbm_te = _auc(y_te[ok_te],  p_lgbm_te)
+            print(f"  LightGBM  val={auc_lgbm_v:.4f}  test={auc_lgbm_te:.4f}")
 
-            auc_lgbm_val  = _auc(y_v[ok_val],  prob_lgbm_val)
-            auc_lgbm_test = _auc(y_te[ok_te],  prob_lgbm_test)
-            print(f"  LightGBM   val={auc_lgbm_val:.4f}  test={auc_lgbm_test:.4f}")
+            # ── CNN-LSTM (load cached) ─────────────────────────────────────────
+            cnn_code = f"{ticker}_cnn_dir_{direction}_{H}"
+            cnn_path = CACHE_DIR / f"{cnn_code}.keras"
+            if not cnn_path.exists():
+                print(f"  CNN-LSTM model not found: {cnn_path.name} — skipping")
+                continue
+            print(f"  Loading CNN-LSTM: {cnn_path.name}")
+            cnn = tf.keras.models.load_model(str(cnn_path))
 
-            # ── CNN-LSTM ──────────────────────────────────────────────────────
-            X_seq_tr, y_seq_tr = _build_sequences(X_tr_seq, y_tr, SEQ_LEN)
-            X_seq_v,  y_seq_v  = _build_sequences(X_v_seq,  y_v,  SEQ_LEN)
-            X_seq_te, y_seq_te = _build_sequences(X_te_seq, y_te, SEQ_LEN)
+            Xs_v,  ys_v  = _build_sequences(X_v_seq,  y_v,  SEQ_LEN)
+            Xs_te, ys_te = _build_sequences(X_te_seq, y_te, SEQ_LEN)
+            p_cnn_v  = cnn.predict(Xs_v,  verbose=0).flatten()
+            p_cnn_te = cnn.predict(Xs_te, verbose=0).flatten()
+            auc_cnn_v  = _auc(ys_v,  p_cnn_v)
+            auc_cnn_te = _auc(ys_te, p_cnn_te)
+            print(f"  CNN-LSTM  val={auc_cnn_v:.4f}  test={auc_cnn_te:.4f}")
 
-            cnn = build_cnn_lstm(SEQ_LEN, n_feat)
-            _fit(cnn, X_seq_tr, y_seq_tr, X_seq_v, y_seq_v)
+            # ── align LightGBM to CNN-LSTM rows (CNN drops first SEQ_LEN rows) ─
+            cnn_vi   = np.array([i for i in range(SEQ_LEN, len(X_val))  if not np.isnan(y_v[i])])
+            cnn_ti   = np.array([i for i in range(SEQ_LEN, len(X_test)) if not np.isnan(y_te[i])])
+            lgbm_vi  = {orig: pos for pos, orig in enumerate(np.where(ok_val)[0])}
+            lgbm_ti  = {orig: pos for pos, orig in enumerate(np.where(ok_te)[0])}
+            shared_v = [i for i in cnn_vi if i in lgbm_vi]
+            shared_t = [i for i in cnn_ti if i in lgbm_ti]
+            cnn_vmap = {orig: pos for pos, orig in enumerate(cnn_vi)}
+            cnn_tmap = {orig: pos for pos, orig in enumerate(cnn_ti)}
 
-            prob_cnn_val  = cnn.predict(X_seq_v,  verbose=0).flatten()
-            prob_cnn_test = cnn.predict(X_seq_te, verbose=0).flatten()
+            def _shared(shared, lp, lm, cp, cm, y_arr):
+                lv = np.array([lp[lm[i]] for i in shared])
+                cv = np.array([cp[cm[i]] for i in shared])
+                yv = y_arr[np.array(shared)]
+                return lv, cv, yv
 
-            auc_cnn_val  = _auc(y_seq_v,  prob_cnn_val)
-            auc_cnn_test = _auc(y_seq_te, prob_cnn_test)
-            print(f"  CNN-LSTM   val={auc_cnn_val:.4f}  test={auc_cnn_test:.4f}")
+            lp_sv, cp_sv, y_sv = _shared(shared_v, p_lgbm_v,  lgbm_vi, p_cnn_v,  cnn_vmap, y_v)
+            lp_st, cp_st, y_st = _shared(shared_t, p_lgbm_te, lgbm_ti, p_cnn_te, cnn_tmap, y_te)
 
-            # ── Align val predictions (CNN-LSTM drops first SEQ_LEN rows) ─────
-            # LightGBM val uses ok_val mask; CNN-LSTM val uses seq-valid subset
-            # Intersect to same rows for fair ensemble
-            n_v = len(X_val)
-            cnn_valid_v = np.array([i for i in range(SEQ_LEN, n_v) if not np.isnan(y_v[i])])
-            lgbm_map_v  = {orig: pos for pos, orig in enumerate(np.where(ok_val)[0])}
-            shared_v    = [i for i in cnn_valid_v if i in lgbm_map_v]
+            # ── ensemble weights from val AUC ──────────────────────────────────
+            auc_l = _auc(y_sv, lp_sv)
+            auc_c = _auc(y_sv, cp_sv)
+            w_l   = auc_l / (auc_l + auc_c)
+            w_c   = auc_c / (auc_l + auc_c)
+            ep_sv = w_l * lp_sv + w_c * cp_sv
+            ep_st = w_l * lp_st + w_c * cp_st
 
-            n_te = len(X_test)
-            cnn_valid_te = np.array([i for i in range(SEQ_LEN, n_te) if not np.isnan(y_te[i])])
-            lgbm_map_te  = {orig: pos for pos, orig in enumerate(np.where(ok_te)[0])}
-            shared_te    = [i for i in cnn_valid_te if i in lgbm_map_te]
+            auc_ens_v  = _auc(y_sv, ep_sv)
+            auc_ens_te = _auc(y_st, ep_st)
+            print(f"  Ensemble  val={auc_ens_v:.4f}  test={auc_ens_te:.4f}  "
+                  f"(w_lgbm={w_l:.2f}  w_cnn={w_c:.2f})")
 
-            def _shared_probs(shared, lgbm_probs, lgbm_map, cnn_probs, cnn_valid, y_arr):
-                cnn_pos_map = {orig: pos for pos, orig in enumerate(cnn_valid)}
-                lgb_p = np.array([lgbm_probs[lgbm_map[i]] for i in shared])
-                cnn_p = np.array([cnn_probs[cnn_pos_map[i]] for i in shared])
-                y_s   = y_arr[np.array(shared)]
-                return lgb_p, cnn_p, y_s
+            # ── confusion matrices ─────────────────────────────────────────────
+            t_f1   = _best_threshold(y_sv,  ep_sv)
+            t_prec = _prec_threshold(y_sv,  ep_sv, min_prec=0.60)
 
-            lgb_pv, cnn_pv, y_sv = _shared_probs(
-                shared_v, prob_lgbm_val, lgbm_map_v,
-                prob_cnn_val, cnn_valid_v, y_v)
-            lgb_pt, cnn_pt, y_st = _shared_probs(
-                shared_te, prob_lgbm_test, lgbm_map_te,
-                prob_cnn_test, cnn_valid_te, y_te)
-
-            # ── val-AUC weighted ensemble ──────────────────────────────────────
-            w_lgbm = auc_lgbm_val / (auc_lgbm_val + auc_cnn_val)
-            w_cnn  = auc_cnn_val  / (auc_lgbm_val + auc_cnn_val)
-
-            ens_pv = w_lgbm * lgb_pv + w_cnn * cnn_pv
-            ens_pt = w_lgbm * lgb_pt + w_cnn * cnn_pt
-
-            auc_ens_val  = _auc(y_sv, ens_pv)
-            auc_ens_test = _auc(y_st, ens_pt)
-            gap = abs(auc_ens_val - auc_ens_test)
-            flag = "✓" if gap <= 0.03 else "⚠"
-
-            print(f"  Ensemble   val={auc_ens_val:.4f}  test={auc_ens_test:.4f}  "
-                  f"(w_lgbm={w_lgbm:.2f} w_cnn={w_cnn:.2f})  {flag} gap={gap:.3f}")
-
-            best_test = max(auc_lgbm_test, auc_cnn_test)
-            lift = auc_ens_test - best_test
-            print(f"  Lift over best single model: {lift:+.4f}")
-
-            for model_name, av, at in [
-                ("lightgbm", auc_lgbm_val, auc_lgbm_test),
-                ("cnn_lstm",  auc_cnn_val,  auc_cnn_test),
-                ("ensemble",  auc_ens_val,  auc_ens_test),
+            for split, y_true, lgbm_p, cnn_p, ens_p in [
+                ("val",  y_sv, lp_sv, cp_sv, ep_sv),
+                ("test", y_st, lp_st, cp_st, ep_st),
             ]:
-                rows.append({"model": model_name, "label": col,
-                             "split": "val",  "auc": av})
-                rows.append({"model": model_name, "label": col,
-                             "split": "test", "auc": at})
+                for t_label, t_val in [
+                    ("optimal F1",     t_f1),
+                    ("precision≥0.60", t_prec),
+                ]:
+                    models_data = {
+                        "LightGBM": _cm_block(y_true, lgbm_p, t_val),
+                        "CNN-LSTM":  _cm_block(y_true, cnn_p,  t_val),
+                        "Ensemble":  _cm_block(y_true, ens_p,  t_val),
+                    }
+                    _print_cm(col, split, t_label, models_data)
 
-    df  = pd.DataFrame(rows)
-    out = CACHE_DIR / f"{ticker}_ensemble_eval.parquet"
-    df.to_parquet(out, index=False)
+            # ── register ensemble ──────────────────────────────────────────────
+            ens_code = f"{ticker}_ens_dir_{direction}_{H}"
+            reg[ens_code] = {
+                "ticker": ticker, "model_type": "ens",
+                "target": f"dir_{direction}", "horizon": H,
+                "val_auc":  round(auc_ens_v,  4),
+                "test_auc": round(auc_ens_te, 4),
+                "w_lgbm": round(w_l, 3), "w_cnn": round(w_c, 3),
+                "trained_at": datetime.utcnow().isoformat(),
+            }
+            REGISTRY.write_text(json.dumps(reg, indent=2))
 
-    print(f"\n\n{'='*60}")
-    print("  FINAL COMPARISON")
-    print(f"{'='*60}")
-    pivot = df.pivot_table(
-        index="label", columns=["model", "split"], values="auc"
-    ).round(4)
-    print(pivot.to_string())
-    print(f"\nResults → {out.name}")
-    return df
+            for m, av, at in [("lightgbm", auc_lgbm_v, auc_lgbm_te),
+                               ("cnn_lstm", auc_cnn_v,  auc_cnn_te),
+                               ("ensemble", auc_ens_v,  auc_ens_te)]:
+                rows.append({"label": col, "model": m,
+                             "val_auc": av, "test_auc": at})
+
+    # ── final summary ──────────────────────────────────────────────────────────
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        print(f"\n\n{'='*72}")
+        print(f"  FINAL AUC SUMMARY")
+        print(f"{'='*72}")
+        pivot = df.pivot_table(index="label", columns="model",
+                               values=["val_auc", "test_auc"]).round(4)
+        print(pivot.to_string())
+
+        out = CACHE_DIR / f"{ticker}_ensemble_eval.parquet"
+        df.to_parquet(out, index=False)
+        print(f"\nResults → {out.name}")
 
 
 if __name__ == "__main__":

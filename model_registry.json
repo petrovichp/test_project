@@ -112,5 +112,49 @@
     "ob_levels": 10,
     "trained_at": "2026-05-04T16:11:55.209820",
     "model_file": "btc_dlob_dir_down_100.keras"
+  },
+  "btc_ens_dir_up_60": {
+    "ticker": "btc",
+    "model_type": "ens",
+    "target": "dir_up",
+    "horizon": 60,
+    "val_auc": 0.6792,
+    "test_auc": 0.7043,
+    "w_lgbm": 0.467,
+    "w_cnn": 0.533,
+    "trained_at": "2026-05-04T16:18:34.052051"
+  },
+  "btc_ens_dir_down_60": {
+    "ticker": "btc",
+    "model_type": "ens",
+    "target": "dir_down",
+    "horizon": 60,
+    "val_auc": 0.7065,
+    "test_auc": 0.6687,
+    "w_lgbm": 0.489,
+    "w_cnn": 0.511,
+    "trained_at": "2026-05-04T16:18:41.900469"
+  },
+  "btc_ens_dir_up_100": {
+    "ticker": "btc",
+    "model_type": "ens",
+    "target": "dir_up",
+    "horizon": 100,
+    "val_auc": 0.6106,
+    "test_auc": 0.7136,
+    "w_lgbm": 0.495,
+    "w_cnn": 0.505,
+    "trained_at": "2026-05-04T16:18:50.103414"
+  },
+  "btc_ens_dir_down_100": {
+    "ticker": "btc",
+    "model_type": "ens",
+    "target": "dir_down",
+    "horizon": 100,
+    "val_auc": 0.6417,
+    "test_auc": 0.7251,
+    "w_lgbm": 0.499,
+    "w_cnn": 0.501,
+    "trained_at": "2026-05-04T16:18:56.739465"
   }
 }
