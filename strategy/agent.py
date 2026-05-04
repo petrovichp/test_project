@@ -10,9 +10,9 @@ Each strategy receives a DataFrame with columns:
   ret_sma_200, vwap_dev_1440, sma_50, sma_200
 
 Returns three arrays of length n:
-  signals (+1 long, -1 short, 0 flat)
-  tp_arr  (take-profit price)
-  sl_arr  (stop-loss price)
+  signals  (+1 long, -1 short, 0 flat)
+  tp_pct   (take-profit as fraction of entry price, e.g. 0.008 = 0.8%)
+  sl_pct   (stop-loss  as fraction of entry price, e.g. 0.004 = 0.4%)
 """
 
 import numpy as np
@@ -64,12 +64,10 @@ def strategy_1(df: pd.DataFrame, params: dict) -> tuple:
         (df["rsi_14"]    > 35)
     ).values
 
+    tp_pct  = params.get("tp_pct", 0.010)
+    sl_pct  = params.get("sl_pct", 0.004)
     signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
-    tp_arr  = np.where(signals ==  1, price + tp_mult * atr,
-              np.where(signals == -1, price - tp_mult * atr, price))
-    sl_arr  = np.where(signals ==  1, price - sl_mult * atr,
-              np.where(signals == -1, price + sl_mult * atr, price))
-    return signals, tp_arr, sl_arr
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
 
 
 # ── Strategy 2: Funding Rate Mean-Reversion ───────────────────────────────────
@@ -100,12 +98,10 @@ def strategy_2(df: pd.DataFrame, params: dict) -> tuple:
         (df["rsi_14"] < 40).values
     )
 
+    tp_pct  = params.get("tp_pct", 0.010)
+    sl_pct  = params.get("sl_pct", 0.004)
     signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
-    tp_arr  = np.where(signals ==  1, price + tp_mult * atr,
-              np.where(signals == -1, price - tp_mult * atr, price))
-    sl_arr  = np.where(signals ==  1, price - sl_mult * atr,
-              np.where(signals == -1, price + sl_mult * atr, price))
-    return signals, tp_arr, sl_arr
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
 
 
 # ── Strategy 3: Bollinger Band Mean-Reversion ─────────────────────────────────
@@ -138,12 +134,10 @@ def strategy_3(df: pd.DataFrame, params: dict) -> tuple:
         (df["vwap_dev_1440"]     > 0.002)
     ).values
 
+    tp_pct  = params.get("tp_pct", 0.010)
+    sl_pct  = params.get("sl_pct", 0.004)
     signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
-    tp_arr  = np.where(signals ==  1, price + tp_mult * atr,
-              np.where(signals == -1, price - tp_mult * atr, price))
-    sl_arr  = np.where(signals ==  1, price - sl_mult * atr,
-              np.where(signals == -1, price + sl_mult * atr, price))
-    return signals, tp_arr, sl_arr
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
 
 
 # ── Strategy 4: MACD + SMA Trend Following ────────────────────────────────────
@@ -182,12 +176,10 @@ def strategy_4(df: pd.DataFrame, params: dict) -> tuple:
         (df["p_dn_60"]      >  dp)
     ).values
 
+    tp_pct  = params.get("tp_pct", 0.010)
+    sl_pct  = params.get("sl_pct", 0.004)
     signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
-    tp_arr  = np.where(signals ==  1, price + tp_mult * atr,
-              np.where(signals == -1, price - tp_mult * atr, price))
-    sl_arr  = np.where(signals ==  1, price - sl_mult * atr,
-              np.where(signals == -1, price + sl_mult * atr, price))
-    return signals, tp_arr, sl_arr
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
 
 
 # ── Strategy 5: OFI Momentum Scalp ───────────────────────────────────────────
@@ -224,12 +216,10 @@ def strategy_5(df: pd.DataFrame, params: dict) -> tuple:
         (df["vol_pred"]     >  vol_floor)
     ).values
 
+    tp_pct  = params.get("tp_pct", 0.010)
+    sl_pct  = params.get("sl_pct", 0.004)
     signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
-    tp_arr  = np.where(signals ==  1, price + tp_mult * atr,
-              np.where(signals == -1, price - tp_mult * atr, price))
-    sl_arr  = np.where(signals ==  1, price - sl_mult * atr,
-              np.where(signals == -1, price + sl_mult * atr, price))
-    return signals, tp_arr, sl_arr
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
 
 
 # ── Strategy 6: Two-Signal High-Precision ────────────────────────────────────
@@ -265,12 +255,10 @@ def strategy_6(df: pd.DataFrame, params: dict) -> tuple:
         (df["vol_pred"]          > vp)
     ).values
 
+    tp_pct  = params.get("tp_pct", 0.010)
+    sl_pct  = params.get("sl_pct", 0.004)
     signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
-    tp_arr  = np.where(signals ==  1, price + tp_mult * atr,
-              np.where(signals == -1, price - tp_mult * atr, price))
-    sl_arr  = np.where(signals ==  1, price - sl_mult * atr,
-              np.where(signals == -1, price + sl_mult * atr, price))
-    return signals, tp_arr, sl_arr
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
 
 
 # ── registry ──────────────────────────────────────────────────────────────────
@@ -285,12 +273,14 @@ STRATEGIES = {
 }
 
 DEFAULT_PARAMS = {
-    "S1_VolDir":    {"vol_thresh": 0.60, "dir_thresh": 0.50, "tp_mult": 1.5, "sl_mult": 0.8},
-    "S2_Funding":   {"fund_z_thresh": 2.0, "tp_mult": 1.5, "sl_mult": 1.0},
-    "S3_BBRevert":  {"vol_ceil": 0.50, "ofi_thresh": 0.0, "tp_mult": 1.0, "sl_mult": 0.5},
-    "S4_MACDTrend": {"vol_thresh": 0.60, "dir_thresh": 0.45, "sma_dev": 0.002,
-                     "tp_mult": 2.0, "sl_mult": 1.0},
-    "S5_OFIScalp":  {"ofi_sigma": 2.0, "vol_floor": 0.40, "tp_mult": 0.8, "sl_mult": 0.4},
-    "S6_TwoSignal": {"vol_thresh": 0.55, "dir_req": 0.55, "dir_opp": 0.30,
-                     "tp_mult": 2.0, "sl_mult": 1.0},
+    # tp_pct / sl_pct are fractions of entry price (e.g. 0.008 = 0.8%)
+    # Label threshold = 0.008 → TP set at or near that, SL below
+    "S1_VolDir":    {"vol_thresh": 0.60, "dir_thresh": 0.50, "tp_pct": 0.010, "sl_pct": 0.004},
+    "S2_Funding":   {"fund_z_thresh": 2.0,                   "tp_pct": 0.012, "sl_pct": 0.005},
+    "S3_BBRevert":  {"vol_ceil": 0.50, "ofi_thresh": 0.0,    "tp_pct": 0.008, "sl_pct": 0.003},
+    "S4_MACDTrend": {"vol_thresh": 0.60, "dir_thresh": 0.45,
+                     "sma_dev": 0.002,                        "tp_pct": 0.015, "sl_pct": 0.005},
+    "S5_OFIScalp":  {"ofi_sigma": 2.0, "vol_floor": 0.40,   "tp_pct": 0.006, "sl_pct": 0.003},
+    "S6_TwoSignal": {"vol_thresh": 0.55, "dir_req": 0.55,
+                     "dir_opp": 0.30,                         "tp_pct": 0.012, "sl_pct": 0.004},
 }

@@ -97,31 +97,31 @@ class EngineResult:
 
 
 def run(
-    signals:    np.ndarray,   # shape (n,): +1 long, -1 short, 0 flat
-    prices:     np.ndarray,   # shape (n,): bar close prices
-    tp_arr:     np.ndarray,   # shape (n,): take-profit price per bar
-    sl_arr:     np.ndarray,   # shape (n,): stop-loss price per bar
-    timestamps: np.ndarray,   # shape (n,): unix timestamps
+    signals:         np.ndarray,  # (n,): +1 long, -1 short, 0 flat
+    prices:          np.ndarray,  # (n,): bar close prices
+    tp_pct_arr:      np.ndarray,  # (n,): take-profit as fraction of entry (e.g. 0.008)
+    sl_pct_arr:      np.ndarray,  # (n,): stop-loss  as fraction of entry (e.g. 0.003)
+    timestamps:      np.ndarray,  # (n,): unix timestamps
     initial_capital: float = 10_000,
-    risk_per_trade:  float = 0.01,    # 1% of equity risked per trade
+    position_size:   float = 0.10,   # fraction of equity per trade (10%)
 ) -> EngineResult:
     """
-    Simulate bar-by-bar execution with 1-bar signal lag.
+    Bar-by-bar simulation with 1-bar execution lag.
 
     Signal at bar T → enter at bar T+1 close.
-    TP/SL checked every bar after entry.
+    TP/SL are percentages of entry price — checked every bar after entry.
+    Position size is a fixed fraction of current equity.
     """
     n      = len(signals)
     equity = np.full(n + 1, initial_capital)
     trades: list[Trade] = []
-
     position: Trade | None = None
 
     for i in range(1, n):
         price = prices[i]
         eq    = equity[i]
 
-        # ── manage open position ───────────────────────────────────────────
+        # ── manage open position ──────────────────────────────────────────
         if position is not None:
             hit_tp = (position.direction ==  1 and price >= position.tp) or \
                      (position.direction == -1 and price <= position.tp)
@@ -129,43 +129,42 @@ def run(
                      (position.direction == -1 and price >= position.sl)
 
             if hit_tp or hit_sl:
-                exit_price  = position.tp if hit_tp else position.sl
-                exit_reason = "TP" if hit_tp else "SL"
-                raw_pnl     = position.direction * (exit_price / position.entry - 1)
-                net_pnl     = raw_pnl - 2 * TAKER_FEE
-                position.bar_out    = i
-                position.exit       = exit_price
-                position.pnl_pct    = net_pnl
-                position.exit_reason = exit_reason
+                exit_price   = position.tp if hit_tp else position.sl
+                raw_pnl      = position.direction * (exit_price / position.entry - 1)
+                net_pnl      = raw_pnl - 2 * TAKER_FEE
+                position.bar_out     = i
+                position.exit        = exit_price
+                position.pnl_pct     = net_pnl
+                position.exit_reason = "TP" if hit_tp else "SL"
                 trades.append(position)
-                equity[i + 1] = eq * (1 + net_pnl * risk_per_trade /
-                                      abs(position.sl / position.entry - 1))
+                equity[i + 1] = eq * (1 + net_pnl * position_size)
                 position = None
                 continue
 
-        equity[i + 1] = equity[i]   # carry forward if no exit
+        equity[i + 1] = equity[i]
 
-        # ── check for new signal (1-bar lag: signal from bar i-1) ─────────
+        # ── new signal (1-bar lag) ────────────────────────────────────────
         if position is None and signals[i - 1] != 0:
             direction = int(signals[i - 1])
-            entry     = price * (1 + direction * TAKER_FEE)   # fee on entry
-            tp        = tp_arr[i - 1]
-            sl        = sl_arr[i - 1]
+            entry     = price * (1 + direction * TAKER_FEE)
+            tp_pct    = float(tp_pct_arr[i - 1])
+            sl_pct    = float(sl_pct_arr[i - 1])
+            tp        = entry * (1 + direction * tp_pct)
+            sl        = entry * (1 - direction * sl_pct)
 
-            # sanity: tp/sl must be on correct sides
-            if direction == 1  and tp > entry and sl < entry:
+            if direction ==  1 and tp > entry and sl < entry:
                 position = Trade(i, direction, entry, tp, sl)
             elif direction == -1 and tp < entry and sl > entry:
                 position = Trade(i, direction, entry, tp, sl)
 
-    # force-close any open position at last bar
+    # force-close at last bar
     if position is not None:
-        price = prices[-1]
-        raw_pnl = position.direction * (price / position.entry - 1)
-        net_pnl = raw_pnl - 2 * TAKER_FEE
-        position.bar_out    = n - 1
-        position.exit       = price
-        position.pnl_pct    = net_pnl
+        price    = prices[-1]
+        raw_pnl  = position.direction * (price / position.entry - 1)
+        net_pnl  = raw_pnl - 2 * TAKER_FEE
+        position.bar_out     = n - 1
+        position.exit        = price
+        position.pnl_pct     = net_pnl
         position.exit_reason = "EOD"
         trades.append(position)
 

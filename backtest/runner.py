@@ -217,8 +217,8 @@ def run(ticker: str = "btc"):
 
     for name, (fn, desc) in STRATEGIES.items():
         params  = DEFAULT_PARAMS[name]
-        signals, tp_arr, sl_arr = fn(sdf, params)
-        result  = bt_run(signals, prices, tp_arr, sl_arr, timestamps)
+        signals, tp_pct, sl_pct = fn(sdf, params)
+        result  = bt_run(signals, prices, tp_pct, sl_pct, timestamps)
 
         _print_row(name, desc, result)
 
@@ -289,8 +289,8 @@ def run(ticker: str = "btc"):
 
     for name, (fn, desc) in STRATEGIES.items():
         params  = DEFAULT_PARAMS[name]
-        signals, tp_arr, sl_arr = fn(sdf_te, params)
-        result  = bt_run(signals, prices_te, tp_arr, sl_arr, ts_te)
+        signals, tp_pct, sl_pct = fn(sdf_te, params)
+        result  = bt_run(signals, prices_te, tp_pct, sl_pct, ts_te)
 
         _print_row(name, desc, result)
 
