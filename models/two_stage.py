@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from data.loader import load_meta
 from features.assembly import assemble
-from models.volatility import _compute_targets, _lgb_params as _vol_lgb_params
+from models.volatility import _compute_targets, _LGB_PARAMS as _VOL_LGB_PARAMS
 from models.direction_dl import (
     SEQ_FEATURES, SEQ_LEN, HORIZONS, THRESHOLD,
     _compute_labels, _build_sequences, _auc,
@@ -112,7 +112,7 @@ def run(ticker: str = "btc"):
         ok_v      = ~np.isnan(y_atr_v)
         ds_tr     = lgb.Dataset(X_train[ok_tr], label=y_atr_tr[ok_tr])
         ds_v      = lgb.Dataset(X_val[ok_v],    label=y_atr_v[ok_v], reference=ds_tr)
-        vp        = _vol_lgb_params()
+        vp        = dict(_VOL_LGB_PARAMS)
         vol_model = lgb.train(vp, ds_tr, num_boost_round=500,
                               valid_sets=[ds_v],
                               callbacks=[lgb.early_stopping(50, verbose=False),
