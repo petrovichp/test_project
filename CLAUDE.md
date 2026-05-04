@@ -38,6 +38,8 @@ Loader: `data/loader.py` — `load_meta(ticker)` or `load(ticker, include_ob=Tru
 | `data/gaps.py` | `clean_mask(timestamps, max_lookback)` — flags gap-contaminated rows (9.45% missing) |
 | `models/splits.py` | `sequential(n, 0.50, 0.25)` and `walk_forward(ts, 90, 30, 30)` → 6 folds |
 | `models/volatility.py` | Volatility research. Run: `python3 -m models.volatility btc` |
+| `models/calibration.py` | Isotonic calibration. Run: `python3 -m models.calibration btc` |
+| `models/two_stage.py` | Two-stage pipeline experiment. Run: `python3 -m models.two_stage btc` |
 | `models/direction.py` | LightGBM direction model. Run: `python3 -m models.direction btc` |
 | `models/direction_dl.py` | CNN-LSTM. Run: `python3 -m models.direction_dl btc cnn_lstm` |
 | `models/ensemble.py` | LightGBM + CNN-LSTM weighted ensemble. Run: `python3 -m models.ensemble btc` |
@@ -114,45 +116,46 @@ Val underperforms test — val period (Oct–Dec 2025) includes the Nov outage (
 Labels: `Y_up_H = max(price[t+1:t+H]) / price[t] - 1 > 0.8%`, symmetric for `Y_down_H`.
 Horizons: 60 and 100 bars. Results cached at `cache/btc_direction_eval.parquet`, `cache/btc_ensemble_eval.parquet`.
 
-**AUC comparison (test set):**
+**Pipeline: two-stage (ATR rank as permanent feature)**
+`btc_lgbm_atr_30` predictions → percentile rank → appended to X_train/val/test before training direction models.
 
-| Label | LightGBM | CNN-LSTM | **Ensemble** |
-|---|---|---|---|
-| down_60 | 0.698 | 0.732 | **0.736** |
-| up_60 | 0.689 | 0.701 | **0.711** |
-| down_100 | 0.675 | 0.683 | **0.702** |
-| up_100 | 0.655 | 0.647 | **0.656** |
+**AUC comparison (test set, two-stage ensemble):**
+
+| Label | LightGBM | CNN-LSTM | **Ensemble** | vs old ensemble |
+|---|---|---|---|---|
+| up_60 | 0.644 | 0.753 | **0.754** | +0.043 |
+| down_60 | 0.681 | 0.707 | **0.708** | +0.039 |
+| up_100 | 0.690 | 0.715 | **0.719** | +0.005 |
+| down_100 | 0.701 | 0.730 | **0.733** | +0.008 |
 
 Walk-forward up_60: **6/6 folds > 0.52**, mean AUC=0.66. Gate to DL stage: PASS.
 
-**Top direction features:** `vwap_1440`, `bb_width`, `fund_mom_480/1440`, `obv_1440`, `oi_z_1440`, `hour_sin/cos`, `taker_net_60`. Funding rate momentum and VWAP dominate.
+**Top direction features:** `vwap_1440`, `bb_width`, `fund_mom_480/1440`, `obv_1440`, `oi_z_1440`, `hour_sin/cos`, `taker_net_60`, `ofi_perp_10`, `atr_rank` (new).
 
 **Confusion matrices (test, optimal F1 threshold):**
 
 | Label | Model | Precision | Recall | F1 | Signal rate |
 |---|---|---|---|---|---|
-| down_60 | Ensemble | 0.258 | 0.389 | 0.310 | 19% |
-| up_60 | Ensemble | 0.258 | 0.313 | 0.283 | 12% |
-| down_100 | Ensemble | 0.308 | 0.592 | 0.405 | 37% |
-| down_60 | CNN-LSTM | 0.236 | 0.515 | 0.324 | 28% |
+| down_100 | CNN-LSTM | **0.355** | 0.550 | 0.432 | 30% |
+| down_100 | Ensemble | 0.395 | 0.391 | 0.393 | 19% |
+| up_60 | CNN-LSTM | 0.188 | 0.668 | 0.294 | 35% |
+| down_60 | CNN-LSTM | 0.250 | 0.479 | 0.328 | 25% |
 
-**Key findings from confusion matrices:**
-- LightGBM alone fires almost nothing at H=60 (0 predicted positives) — not tradeable alone
-- CNN-LSTM fires too aggressively (80% signal rate for up_60) — too many false positives
-- Ensemble is the only tradeable model — balances precision and recall
-- Precision ≥ 0.70 threshold unachievable at any useful recall — model scores are compressed, calibration needed
-- Positive rate grows from train→val→test (1.9% → 6.6% → 12.6%) — market became more directional, not leakage
+**Key findings:**
+- Two-stage ATR feature: +0.039–0.050 AUC on up_60 and down_60, genuine improvement
+- Calibration: no improvement — isotonic remaps thresholds but doesn't change ranking
+- Precision ≥ 0.60 still unachievable at useful recall — requires more signal, not calibration
+- CNN-LSTM `down_100` at t=0.90: precision=0.483 with 5.4% recall — highest precision achieved
 
-**DeepLOB:** Optimised (20 OB levels, scaled matrix cached to `cache/btc_deeplob_ob20_scaled.npz`). Not yet trained — run: `python3 -m models.direction_dl btc deeplob`
+**DeepLOB: dropped** — test AUC 0.39–0.55, two labels below 0.50. Raw OB bins insufficient.
 
 ---
 
 ### Pending tasks
-- Probability calibration (Platt scaling / isotonic) — fix compressed probability scores so precision≥0.70 becomes achievable
 - Cross-asset: run vol + direction models on ETH and SOL
-- Two-stage pipeline: feed predicted ATR as feature into direction model
-- DeepLOB training (infrastructure ready, run when needed)
+- OB depth span: add dollar range per bin to cloud function collection
 - Backtest: plug ensemble signals into `backtest/engine.py` with OKX fees (taker 0.08%, maker 0.02%)
+- More signal: feature engineering improvements or architecture changes to push precision higher
 
 ---
 

@@ -109,14 +109,17 @@ Walk-forward: **all 6 folds positive** (0.57–0.80). Signal is consistent acros
 
 Labels: `Y_up_H = max(price[t+1:t+H]) / price[t] - 1 > 0.8%`, symmetric for down. H=60 and 100.
 
-**AUC comparison (test set):**
+**Two-stage pipeline:** `btc_lgbm_atr_30` ATR rank prediction permanently included as feature.
+Improved AUC by +0.039–0.050 on up_60 and down_60.
 
-| Label | LightGBM | CNN-LSTM | **Ensemble** |
-|---|---|---|---|
-| down_100 | 0.703 | 0.720 | **0.725** |
-| up_100 | 0.646 | 0.702 | **0.714** |
-| up_60 | 0.640 | 0.699 | **0.704** |
-| down_60 | 0.670 | 0.667 | **0.669** |
+**AUC comparison (test set, two-stage ensemble):**
+
+| Label | LightGBM | CNN-LSTM | **Ensemble** | vs no ATR |
+|---|---|---|---|---|
+| up_60 | 0.644 | 0.753 | **0.754** | +0.043 |
+| down_60 | 0.681 | 0.707 | **0.708** | +0.039 |
+| up_100 | 0.690 | 0.715 | **0.719** | +0.005 |
+| down_100 | 0.701 | 0.730 | **0.733** | +0.008 |
 
 Walk-forward up_60: **6/6 folds > 0.52**, mean AUC=0.66. Gate to DL stage: PASS.
 
@@ -159,36 +162,37 @@ Walk-forward up_60: **6/6 folds > 0.52**, mean AUC=0.66. Gate to DL stage: PASS.
 
 ## Model Training Plan — Next Steps
 
+### Completed experiments
+
+**Probability calibration** (`models/calibration.py`) — **no improvement**
+- Isotonic regression on val predictions: AUC unchanged, precision negligibly affected
+- Root cause: calibration remaps output scale but cannot improve the model's ranking ability
+- Conclusion: need more signal, not calibration
+
+**Two-stage pipeline** (`models/two_stage.py`, now in `models/ensemble.py`) — **genuine improvement**
+- ATR rank feature: +0.039–0.050 AUC on up_60 and down_60
+- Now permanently included in ensemble as default
+- CNN models saved as `btc_cnn2s_dir_*`, ensemble as `btc_ens2s_dir_*`
+
 ### Pending (priority order)
 
-**1. Probability calibration (highest priority)**
-- Problem: all model scores compressed — precision ≥ 0.70 unachievable at any recall
-- Fix: apply Platt scaling (logistic regression on val probabilities) or isotonic regression
-- Target: `down_100` CNN-LSTM at precision ≥ 0.70 after calibration
-- Implementation: `models/calibration.py` — wrap existing models with sklearn `CalibratedClassifierCV`
-
-**2. Two-stage pipeline**
-- Feed predicted ATR (from volatility model) as a feature into direction models
-- Expected: helps direction model calibrate its confidence during high-vol periods
-- Implementation: add `btc_lgbm_atr_30` predictions as a feature column in `features/assembly.py`
-
-**3. Cross-asset (ETH and SOL)**
+**1. Cross-asset (ETH and SOL)**
 - Run same volatility and direction pipeline on ETH and SOL
 - Use BTC lag-1 return as cross-asset feature for ETH/SOL models
 - Check: does signal transfer across assets with same feature set?
 
-**4. Backtest**
+**2. Backtest**
 - Plug ensemble signals into `backtest/engine.py`
 - OKX fees: taker 0.08%, maker 0.02%
 - Execution lag: 1-bar delay
 - Evaluate: Sharpe ratio, max drawdown, profit factor
 
-**5. OB depth span (data collection improvement)**
+**3. OB depth span (data collection improvement)**
 - Currently `span_spot_price` = bid-ask spread (not OB depth range)
 - Add actual dollar range covered by 200 bins to collection pipeline
 - Unlocks true price-level features: "liquidity within ±0.5% of mid"
 
-**6. DeepLOB (revisit with more data)**
+**4. DeepLOB (revisit with more data)**
 - Current dataset too small and noisy for raw OB sequence learning
 - Revisit when ETH/SOL data is added (3× more samples) or with GPU training
 
