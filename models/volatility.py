@@ -71,6 +71,55 @@ def _metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     return {"rmse": rmse, "mae": mae, "spearman": corr, "dir_acc": dir_acc}
 
 
+def _confusion_vol(y_true_val: np.ndarray, y_pred_val: np.ndarray,
+                   y_true_test: np.ndarray, y_pred_test: np.ndarray,
+                   label: str, pct: int = 33):
+    """
+    Convert regression to binary (high-vol vs low-vol) confusion matrix.
+
+    Threshold = top pct% of ACTUAL val volatility.
+    Model fires "high-vol" when predicted value exceeds that same threshold.
+    Shows confusion matrix on val and test side-by-side.
+
+    pct=33 → top tercile = "high volatility" (positive class).
+    pct=10 → top decile  = "extreme volatility".
+    """
+    from sklearn.metrics import precision_score, recall_score, f1_score
+
+    for pct_cut in [33, 10]:
+        cutoff = np.percentile(y_true_val, 100 - pct_cut)
+
+        y_true_v  = (y_true_val  >= cutoff).astype(int)
+        y_pred_v  = (y_pred_val  >= cutoff).astype(int)
+        y_true_te = (y_true_test >= cutoff).astype(int)
+        y_pred_te = (y_pred_test >= cutoff).astype(int)
+
+        print(f"\n  ── Confusion matrix: top-{pct_cut}% = high vol  "
+              f"(threshold={cutoff:.6f}) ──────────────────")
+        print(f"  {'':20}  {'VAL':>30}  {'TEST':>30}")
+        print(f"  {'':20}  {'Pred LOW':>14}{'Pred HIGH':>16}  {'Pred LOW':>14}{'Pred HIGH':>16}")
+
+        for act_label, act_v, act_te in [("Actual LOW",  0, 0), ("Actual HIGH", 1, 1)]:
+            mask_v  = y_true_v  == act_v
+            mask_te = y_true_te == act_te
+            tn_v  = ((y_pred_v  == 0) & mask_v).sum()
+            tp_v  = ((y_pred_v  == 1) & mask_v).sum()
+            tn_te = ((y_pred_te == 0) & mask_te).sum()
+            tp_te = ((y_pred_te == 1) & mask_te).sum()
+            print(f"  {act_label:<20}  {tn_v:>14,}{tp_v:>16,}  {tn_te:>14,}{tp_te:>16,}")
+
+        def _stats(yt, yp, tag):
+            prec = precision_score(yt, yp, zero_division=0)
+            rec  = recall_score(yt, yp, zero_division=0)
+            f1   = f1_score(yt, yp, zero_division=0)
+            n_pp = yp.sum()
+            print(f"  {tag:<20}  Precision={prec:.3f}  Recall={rec:.3f}  "
+                  f"F1={f1:.3f}  Pred-high={n_pp:,}")
+
+        _stats(y_true_v,  y_pred_v,  "VAL metrics")
+        _stats(y_true_te, y_pred_te, "TEST metrics")
+
+
 # ── LightGBM helpers ──────────────────────────────────────────────────────────
 
 def _lgb_params(objective="regression", alpha=None):
@@ -235,14 +284,42 @@ def run(ticker: str = "btc"):
               f"test {fmt(ts_clean[fold.test[0]]):>12}  "
               f"{met['spearman']:>+.3f}  {met['dir_acc']:>7.3f}")
 
-    # ── 4. top features for best model (atr_15 regressor) ────────────────────
-    print("\n── Feature importance: atr_15 (val) ─────────────────────────────")
-    col   = "atr_15"
-    y_tr  = _get_labels(ts_train, col);  ok_tr  = ~np.isnan(y_tr)
-    y_v   = _get_labels(ts_val,   col);  ok_val = ~np.isnan(y_v)
-    best_model = _train(X_train[ok_tr], y_tr[ok_tr],
+    # ── 4. confusion matrices + feature importance for best targets ──────────
+    print("\n\n── Confusion matrices (regression → binary: high-vol vs low-vol) ──")
+    print("   Threshold set on val actual values, applied to both val and test.")
+    print("   Spearman = rank correlation (1=perfect, 0=random).")
+    print("   DirAcc   = % of bars correctly classified as top-33% vol or not.")
+
+    for col in ["atr_15", "atr_30", "realized_vol_15"]:
+        ttype, H = col.rsplit("_", 1)
+        H = int(H)
+        print(f"\n{'='*60}")
+        print(f"  Target: {col}")
+        print(f"{'='*60}")
+
+        y_tr  = _get_labels(ts_train, col);  ok_tr  = ~np.isnan(y_tr)
+        y_v   = _get_labels(ts_val,   col);  ok_val = ~np.isnan(y_v)
+        y_te  = _get_labels(ts_test,  col);  ok_te  = ~np.isnan(y_te)
+
+        model  = _train(X_train[ok_tr], y_tr[ok_tr],
                         X_val[ok_val],  y_v[ok_val], _lgb_params())
-    _print_top_features(best_model, feat_cols)
+
+        p_val  = model.predict(X_val[ok_val])
+        p_test = model.predict(X_test[ok_te])
+
+        m_val  = _metrics(y_v[ok_val],  p_val)
+        m_test = _metrics(y_te[ok_te],  p_test)
+
+        print(f"\n  Regression metrics:")
+        print(f"  {'':8}  Spearman   RMSE       DirAcc")
+        print(f"  {'Val':<8}  {m_val['spearman']:>+.3f}     {m_val['rmse']:.6f}   {m_val['dir_acc']:.3f}")
+        print(f"  {'Test':<8}  {m_test['spearman']:>+.3f}     {m_test['rmse']:.6f}   {m_test['dir_acc']:.3f}")
+
+        _confusion_vol(y_v[ok_val], p_val, y_te[ok_te], p_test, col)
+
+        if col == "atr_15":
+            print(f"\n  Top 15 features:")
+            _print_top_features(model, feat_cols, n=15)
 
     # save results
     df = pd.DataFrame(rows)
