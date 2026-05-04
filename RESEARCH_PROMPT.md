@@ -181,11 +181,10 @@ Walk-forward up_60: **6/6 folds > 0.52**, mean AUC=0.66. Gate to DL stage: PASS.
 - Use BTC lag-1 return as cross-asset feature for ETH/SOL models
 - Check: does signal transfer across assets with same feature set?
 
-**2. Backtest**
-- Plug ensemble signals into `backtest/engine.py`
-- OKX fees: taker 0.08%, maker 0.02%
-- Execution lag: 1-bar delay
-- Evaluate: Sharpe ratio, max drawdown, profit factor
+**2. Backtest engine — implement and run all strategies**
+- Build `backtest/engine.py`: simulate bar-by-bar execution, OKX fees (taker 0.08%, maker 0.02%), 1-bar lag
+- Run Strategies 1–6 individually on test set, evaluate Sharpe / max drawdown / profit factor
+- RL agent (Strategy 7) requires backtest engine as simulation environment
 
 **3. OB depth span (data collection improvement)**
 - Currently `span_spot_price` = bid-ask spread (not OB depth range)
@@ -195,6 +194,119 @@ Walk-forward up_60: **6/6 folds > 0.52**, mean AUC=0.66. Gate to DL stage: PASS.
 **4. DeepLOB (revisit with more data)**
 - Current dataset too small and noisy for raw OB sequence learning
 - Revisit when ETH/SOL data is added (3× more samples) or with GPU training
+
+---
+
+## Trading Strategy Plan
+
+All signals are already computed in the feature pipeline (`features/assembly.py`).
+Technical indicators available: `bb_pct_b`, `bb_width`, `macd_hist`, `macd`, `macd_signal`,
+`rsi_6`, `rsi_14`, `sma_20/50/200`, `ema_12/26`, `ret_sma_200`, `vwap_1440`, `vwap_dev_1440`.
+ML signals: `vol_pred` (ATR rank), `p_up_60`, `p_dn_60`, `p_up_100`, `p_dn_100`.
+
+### Strategy 1 — Volatility-Filtered Direction
+Use vol model as regime gate, direction ensemble for side, technical indicators to avoid overextended entries.
+```
+Entry long : vol_pred > 0.65 AND p_up_60 > 0.50 AND bb_pct_b < 0.70 AND rsi_14 < 65
+Entry short: vol_pred > 0.65 AND p_dn_60 > 0.50 AND bb_pct_b > 0.30 AND rsi_14 > 35
+TP = entry ± 1.5 × atr_30   |   SL = entry ∓ 0.8 × atr_30   |   Time stop: 60 bars
+Position size ∝ vol_pred
+```
+Best for: volatile trending sessions (NY hours 13–21 UTC).
+
+### Strategy 2 — Funding Rate Mean-Reversion
+Extreme funding creates carry pressure that reverses. MACD confirms weakening momentum.
+```
+Entry short: fund_rate > 95th pct AND fund_mom_480 > 0 AND macd_hist < 0 AND rsi_14 > 60
+Entry long : fund_rate < 5th pct  AND fund_mom_480 < 0 AND macd_hist > 0 AND rsi_14 < 40
+TP: funding returns to ±1σ   |   SL: 2% adverse move   |   Max hold: 240 bars
+```
+Best for: low-frequency (~3–5 trades/day), late Asia session when funding imbalances build.
+
+### Strategy 3 — Bollinger Band Mean-Reversion
+Price at BB extreme + OFI normalising + low vol regime = mean-reversion setup.
+```
+Entry long : bb_pct_b < 0.05 AND ofi_perp_10_r15 > 0 AND taker_imb_5 > -0.2
+             AND vol_pred < 0.50 AND vwap_dev_1440 < -0.005
+Entry short: bb_pct_b > 0.95 AND ofi_perp_10_r15 < 0 AND taker_imb_5 < 0.2
+             AND vol_pred < 0.50 AND vwap_dev_1440 > 0.005
+TP: bb_pct_b returns to 0.50 (midline)   |   SL: bb_pct_b hits 0.00 or 1.00   |   Time stop: 30 bars
+```
+Key: only fires in tight-band regimes (low `bb_width`). Wide band = trend continuation, skip.
+
+### Strategy 4 — MACD + SMA Trend Following
+SMA stack confirms bullish/bearish structure, MACD histogram expanding, vol supports trend.
+```
+Entry long : macd_hist > 0 AND macd_hist expanding AND price > sma_50 > sma_200
+             AND ret_sma_200 > 0.002 AND vol_pred > 0.60 AND p_up_60 > 0.45
+Entry short: macd_hist < 0 AND macd_hist expanding AND price < sma_50 < sma_200
+             AND ret_sma_200 < -0.002 AND vol_pred > 0.60 AND p_dn_60 > 0.45
+TP = 2 × atr_30   |   SL: price crosses sma_50 OR 1 × atr_30   |   Trailing stop at breakeven
+```
+Best for: strong trending sessions with high OI buildup (`oi_z_1440` elevated).
+
+### Strategy 5 — OFI Momentum Scalp
+True OFI spike signals imminent price move. Short hold, tight exits.
+```
+Entry long : ofi_perp_10_r15 > +2σ AND ofi_perp_10 > 0 AND taker_net_15 > 0 AND rsi_6 < 70
+Entry short: ofi_perp_10_r15 < -2σ AND ofi_perp_10 < 0 AND taker_net_15 < 0 AND rsi_6 > 30
+TP = 0.8 × atr_30   |   SL = 0.4 × atr_30   |   Hard time stop: 15 bars
+Exit immediately if OFI reverses sign
+```
+Warning: 0.16% round-trip fees — viable only with maker orders or avg move > 0.5%.
+
+### Strategy 6 — Two-Signal High-Precision
+Multiple independent signals must agree. Low frequency (~3–5% of bars), highest precision.
+```
+Entry long : p_up_60 > 0.55 AND p_dn_60 < 0.30 AND macd_hist > 0
+             AND 45 < rsi_14 < 65 AND ofi_perp_10_r15 > 0 AND vol_pred > 0.55
+Entry short: p_dn_60 > 0.55 AND p_up_60 < 0.30 AND macd_hist < 0
+             AND 35 < rsi_14 < 55 AND ofi_perp_10_r15 < 0 AND vol_pred > 0.55
+TP = 2 × atr_30   |   SL = 1 × atr_30   |   Time stop: 60 bars
+```
+Expected precision ~0.45–0.55 based on confusion matrix analysis (10% base rate → 4–5× better than random).
+
+### Strategy 7 — RL Meta-Agent (Strategy Selector)
+An RL agent observes the full market state and selects which strategy (or flat) is most appropriate for the current regime. Acts as an adaptive meta-controller that switches between Strategies 1–6.
+
+**State space (196-dim):**
+- 191 assembled features (technical + microstructure + derivatives)
+- ML outputs: `vol_pred`, `p_up_60`, `p_dn_60`, `p_up_100`, `p_dn_100`
+
+**Action space (8 discrete):**
+```
+0 = Flat   1 = S1 Long   2 = S1 Short   3 = S2 (Funding)
+4 = S3 (BB reversion)    5 = S4 (MACD trend)
+6 = S5 (OFI scalp)       7 = S6 (Two-signal)
+```
+
+**Reward:**
+```
+r_t = pnl_t - 0.0008 × |trade_t| - 0.2 × drawdown_t - 0.1 × overtrading_penalty_t
+```
+
+**Architecture:** LSTM(128) over 30-bar history → Dense(64, 32) → Policy head (Softmax 8) + Value head (Dense 1)
+**Algorithm:** PPO (Proximal Policy Optimization) — handles non-stationarity of market data
+**Training:** Walk-forward, 90-day train / 30-day eval windows, simulated execution with fees
+
+**What the agent learns:**
+- High vol + strong trend + high OI → select Strategy 4 (MACD trend)
+- High vol + direction signal → select Strategy 1 (vol-filtered)
+- Extreme funding + weakening price → select Strategy 2 (funding reversion)
+- Low vol + price at BB extreme → select Strategy 3 (BB mean-reversion)
+- Multiple signals aligned → select Strategy 6 (two-signal)
+- Ambiguous state → Flat (preserve capital)
+
+### Implementation Roadmap
+
+| Step | Task | Dependency |
+|---|---|---|
+| 1 | Build `backtest/engine.py` with OKX fees + 1-bar lag | — |
+| 2 | Backtest Strategies 1–4 individually on test set | Step 1 |
+| 3 | Identify per-regime best strategy from backtest | Step 2 |
+| 4 | Build RL environment wrapping backtest engine | Step 1 |
+| 5 | Train PPO agent on walk-forward splits | Steps 3, 4 |
+| 6 | Evaluate RL agent vs best individual strategy | Step 5 |
 
 ---
 
