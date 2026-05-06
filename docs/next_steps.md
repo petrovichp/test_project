@@ -1,6 +1,20 @@
-# Next Steps
+# Experiments Remaining + Next Steps
 
 Forward-looking plan after Group A breakthrough. Companion to [RESULTS.md](../RESULTS.md) and [experiments_log.md](experiments_log.md).
+
+---
+
+## Experiments Remaining (quick index)
+
+| ID | Experiment | Effort | Status |
+|---|---|---|---|
+| **Group B** | Exit-timing DQN (4 cells) | ~1.5–2 days | not started — see below |
+| **Group C** | Stacked entry+exit RL (2 cells) | ~3–5 days | conditional on B success |
+| **Reduced scope** | Lock A4 (walk-forward + seed variance + penalty fine-grid) | ~1 day | recommended before Group B |
+| **Path X** | Maker-only execution scoping | ~3–5 days | production deployment path |
+| **Alternative pivots** | Funding-rate / vol trading / statarb | open-ended | only if Groups B/C don't deliver |
+
+Detailed breakdowns of each experiment in the sections below.
 
 ---
 

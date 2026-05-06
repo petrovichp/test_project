@@ -313,12 +313,17 @@ cache/
 
 ---
 
-## Next Steps
+## Next Steps / Experiments Remaining
 
-See [docs/next_steps.md](docs/next_steps.md) for the full forward plan covering:
-- **Group B** — Exit-timing DQN (~1.5–2 days)
-- **Group C** — Stacked entry+exit RL (~3–5 days, conditional on B)
-- **Reduced scope** — Lock A4 first via mini-validation (~1 day)
-- **Path X** — Maker-only execution infrastructure (~3–5 days)
+→ **Full plan:** [docs/next_steps.md](docs/next_steps.md)
+
+Quick summary of remaining experiments:
+
+| ID | Experiment | Effort | Status |
+|---|---|---|---|
+| Group B | Exit-timing DQN (4 cells) | ~1.5–2 days | not started |
+| Group C | Stacked entry+exit RL | ~3–5 days | conditional on B |
+| Reduced scope | Lock A4 (walk-forward + seed + penalty fine-grid) | ~1 day | recommended before B |
+| Path X | Maker-only execution | ~3–5 days | production deployment |
 
 The recommended next move depends on whether you want **deployment first** (Path X + A4 mini-validation) or **research first** (Group B + C, then deploy the best).
