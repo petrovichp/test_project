@@ -1,5 +1,8 @@
 # Crypto Trading ML — Project Context
 
+> **For complete experimental results and project status, see [RESULTS.md](RESULTS.md), [docs/experiments_log.md](docs/experiments_log.md), and [docs/next_steps.md](docs/next_steps.md).**
+> Latest finding: DQN entry-gating works at maker fees (val Sharpe +1.72 → equity 1.07× over val); fails at taker fees. Production path is Path X (maker-only execution). See RESULTS.md for the full picture.
+
 ## What this project is
 
 Research-first ML system for crypto trading on OKX (BTC/ETH/SOL, 1-minute bars).
@@ -37,15 +40,16 @@ Loader: `data/loader.py` — `load_meta(ticker)` or `load(ticker, include_ob=Tru
 | `data/loader.py` | CSV→Parquet caching. `load_meta('btc')` skips 800 OB cols |
 | `data/gaps.py` | `clean_mask(timestamps, max_lookback)` — flags gap-contaminated rows (9.45% missing) |
 | `models/splits.py` | `sequential(n, 0.50, 0.25)` and `walk_forward(ts, 90, 30, 30)` → 6 folds |
-| `models/volatility.py` | Volatility research. Run: `python3 -m models.volatility btc` |
-| `models/calibration.py` | Isotonic calibration. Run: `python3 -m models.calibration btc` |
-| `models/two_stage.py` | Two-stage pipeline experiment. Run: `python3 -m models.two_stage btc` |
+| `models/volatility.py` | Volatility model. Run: `python3 -m models.volatility btc` |
 | `models/direction.py` | LightGBM direction model. Run: `python3 -m models.direction btc` |
 | `models/direction_dl.py` | CNN-LSTM. Run: `python3 -m models.direction_dl btc cnn_lstm` |
 | `models/ensemble.py` | LightGBM + CNN-LSTM weighted ensemble. Run: `python3 -m models.ensemble btc` |
-| `models/evaluate.py` | Confusion matrix comparison across all models. Run: `python3 -m models.evaluate btc` |
+| `backtest/run.py` | Strategy backtest runner. Run: `python3 -m backtest.run btc` |
+| `backtest/preds.py` | Cached vol + direction predictions (npz cache, mtime-invalidated) |
 
-Caching rule: save expensive intermediates to `cache/` as `.parquet` or `.npy`. Always check cache before recomputing.
+Caching rule: save expensive intermediates to `cache/` as `.parquet` or `.npz`. Always check cache before recomputing.
+
+**Prediction cache:** `_vol_preds` and `_dir_preds` in `backtest/preds.py` cache to `.npz`. Invalidated automatically when model file mtime changes. Reduces backtest from ~80s → 9.5s.
 
 ## Non-negotiable rules
 
@@ -59,12 +63,12 @@ Caching rule: save expensive intermediates to `cache/` as `.parquet` or `.npy`. 
 ## Current research state
 
 ### Features pipeline — done
-130 features across 4 modules, zero NaN after gap masking (MAX_LOOKBACK=1440).
-Cached to `cache/btc_features_*.parquet`. Load via `features/assembly.py`.
+191 features across 4 modules, zero NaN after gap masking (MAX_LOOKBACK=1440).
+Cached to `cache/btc_features_assembled.parquet`. Load via `features/assembly.py`.
 
 | Module | Features | Key contents |
 |---|---|---|
-| `features/orderbook.py` | 32 | bucket amounts, imbalance, velocity, span |
+| `features/orderbook.py` | 32 | bucket amounts, imbalance, OFI, velocity, span |
 | `features/price.py` | 51 | returns, SMA/EMA, RSI, MACD, VWAP, basis |
 | `features/volume.py` | 17 | taker imbalance/net, vol z-score, OBV, OFI |
 | `features/market.py` | 30 | OI, funding rate, spread, calendar, sessions |
@@ -74,88 +78,65 @@ Splits after gap masking: Train 70,902 (Jul→Oct 2025) / Val 35,451 (Oct→Dec 
 ---
 
 ### Volatility model — done (`models/volatility.py`)
-Targets: `atr_H` (avg true range over next H bars, in $) and `realized_vol_H` (std of log returns, %).
-Horizons tested: 15, 30, 60, 100, 240. Results cached at `cache/btc_volatility_eval.parquet`.
+Target: `atr_30` ($range/bar over next 30 bars). Model: LightGBM. Cached: `cache/btc_lgbm_atr_30.txt`.
 
-**Best results (Spearman correlation):**
+| Target | Val Spearman | Test Spearman |
+|---|---|---|
+| atr_30 | 0.627 | **0.801** |
+| atr_15 | 0.647 | 0.784 |
 
-| Target | Val | Test | Walk-forward (6 folds) |
-|---|---|---|---|
-| atr_15 | 0.647 | **0.784** | 0.57–0.80, all positive |
-| atr_30 | 0.627 | **0.801** | — |
-| realized_vol_15 | 0.605 | **0.790** | — |
-| atr_60 | 0.582 | 0.764 | — |
-| atr_100 | 0.559 | 0.726 | — |
-
-Val underperforms test — val period (Oct–Dec 2025) includes the Nov outage (harder regime).
-
-**Confusion matrix (top-33% high-vol detection, atr_15, test):**
-- Precision=0.606, Recall=0.690, F1=0.646 — usable as a vol filter for the strategy layer
-- `realized_vol_15` hits Precision=0.879 on test (best for high-confidence vol filtering)
-
-**Top features (consistent across all targets):**
-1. `bb_width` — 27–29% of gain (current volatility → future volatility, valid clustering effect)
-2. `dow_sin` — 7–9% (weekly seasonality)
-3. `hour_sin` / `hour_cos` — 6–9% (intraday session patterns)
-4. `session_ny` — 2–4% (NY session 13–21 UTC is highest-vol window)
-5. `vwap_dev_1440` / `vwap_1440` / `obv_1440` — 3–4% each (trend regime)
-6. `oi_z_1440` / `fund_mean_1440` — 1.5% each (derivatives positioning)
-7. OB features and short-term taker flow: near zero — vol is regime+calendar driven, not microstructure
-
-**`bb_width` removal experiment (horizons 15, 30, 60, 100):**
-- Removing `bb_width` + `bb_pct_b` drops test Spearman by 0.028–0.068
-- Remaining signal: 0.67–0.76 Spearman — still strong from calendar + trend + derivatives
-- Decision: keep `bb_width` (it's legitimate volatility clustering, not leakage)
-- Strategy rule: if `bb_width` > 95th pct on its own, use it directly; else use model output
-
-**Quantile regression (atr_15, alpha=0.90, test):** Coverage=0.880 (target=0.90) — well calibrated on test.
+Output used as: (1) vol gate `vol_pred` (percentile rank), (2) ATR-dynamic TP/SL scaling, (3) `atr_rank` feature for CNN-LSTM two-stage pipeline.
 
 ---
 
-### Direction model — done (`models/direction.py`, `models/direction_dl.py`, `models/ensemble.py`)
-Labels: `Y_up_H = max(price[t+1:t+H]) / price[t] - 1 > 0.8%`, symmetric for `Y_down_H`.
-Horizons: 60 and 100 bars. Results cached at `cache/btc_direction_eval.parquet`, `cache/btc_ensemble_eval.parquet`.
+### Direction model — done (`models/direction_dl.py`, `models/ensemble.py`)
+Labels: `Y_up_H = max(price[t+1:t+H]) / price[t] - 1 > 0.8%`. Horizons: 60 and 100 bars.
+Pipeline: ATR-30 rank appended to features (two-stage) → CNN-LSTM SEQ_LEN=30.
 
-**Pipeline: two-stage (ATR rank as permanent feature)**
-`btc_lgbm_atr_30` predictions → percentile rank → appended to X_train/val/test before training direction models.
+| Label | CNN-LSTM AUC (test) |
+|---|---|
+| up_60 | **0.753** |
+| down_60 | 0.707 |
+| up_100 | 0.715 |
+| down_100 | 0.730 |
 
-**AUC comparison (test set, two-stage ensemble):**
+Cached: `cache/btc_cnn2s_dir_{up/down}_{60/100}.keras`. Predictions cached: `cache/btc_pred_dir_{col}.npz`.
 
-| Label | LightGBM | CNN-LSTM | **Ensemble** | vs old ensemble |
-|---|---|---|---|---|
-| up_60 | 0.644 | 0.753 | **0.754** | +0.043 |
-| down_60 | 0.681 | 0.707 | **0.708** | +0.039 |
-| up_100 | 0.690 | 0.715 | **0.719** | +0.005 |
-| down_100 | 0.701 | 0.730 | **0.733** | +0.008 |
-
-Walk-forward up_60: **6/6 folds > 0.52**, mean AUC=0.66. Gate to DL stage: PASS.
-
-**Top direction features:** `vwap_1440`, `bb_width`, `fund_mom_480/1440`, `obv_1440`, `oi_z_1440`, `hour_sin/cos`, `taker_net_60`, `ofi_perp_10`, `atr_rank` (new).
-
-**Confusion matrices (test, optimal F1 threshold):**
-
-| Label | Model | Precision | Recall | F1 | Signal rate |
-|---|---|---|---|---|---|
-| down_100 | CNN-LSTM | **0.355** | 0.550 | 0.432 | 30% |
-| down_100 | Ensemble | 0.395 | 0.391 | 0.393 | 19% |
-| up_60 | CNN-LSTM | 0.188 | 0.668 | 0.294 | 35% |
-| down_60 | CNN-LSTM | 0.250 | 0.479 | 0.328 | 25% |
-
-**Key findings:**
-- Two-stage ATR feature: +0.039–0.050 AUC on up_60 and down_60, genuine improvement
-- Calibration: no improvement — isotonic remaps thresholds but doesn't change ranking
-- Precision ≥ 0.60 still unachievable at useful recall — requires more signal, not calibration
-- CNN-LSTM `down_100` at t=0.90: precision=0.483 with 5.4% recall — highest precision achieved
-
-**DeepLOB: dropped** — test AUC 0.39–0.55, two labels below 0.50. Raw OB bins insufficient.
+**Direction model usage rules:**
+- Use only with `vol_pred > 0.60` (vol gate active)
+- Threshold ≥ 0.75 for up_60, ≥ 0.70 for down_60
+- Not for mean-reversion strategies (S2, S3)
 
 ---
+
+### Backtest — done (`backtest/run.py`)
+Bar-by-bar engine with 1-bar lag, OKX fees 0.08%/side, ATR-dynamic TP/SL, breakeven stop, trail-after-breakeven, time stop. **No regime gate** — all strategies fire freely.
+
+Run: `python3 -m backtest.run btc` (~9.5s with cache)
+
+**Latest results — no regime layer (2026-05-05):**
+
+| Strategy | Val Sharpe | Val Win% | Val Trades | Test Sharpe | Test Win% | Test Trades |
+|---|---|---|---|---|---|---|
+| S1_VolDir | **+7.02 ✓** | 46% | 98 | -0.81 | 46% | 140 |
+| S8_TakerFlow | **+2.42 ✓** | 48% | 99 | -6.12 | 34% | 147 |
+| S4_MACDTrend | +0.19 | 39% | 56 | **+0.70 ✓** | 48% | 93 |
+| S5/S7/S9/S11/S13 | structural failures (Sharpe < -20 on both splits) |
+
+**Val/test gap remains the core unsolved problem.** S1 hits Sharpe +7.02 on val (Oct–Dec 2025, Nov outage) but -0.81 on test (Dec 2025–Apr 2026, regime mix). Without a regime mechanism, we don't know when to trust the signal.
+
+---
+
+### Phase 2 — regime classifier (TODO, fresh start)
+
+Phase 2 will add a regime-awareness layer to gate strategies. Approach: TBD.
+Previous Phase 2 attempt (HMM + extended models) was scrapped — see PLAN.md for fresh design.
 
 ### Pending tasks
-- Cross-asset: run vol + direction models on ETH and SOL
-- OB depth span: add dollar range per bin to cloud function collection
-- Backtest: plug ensemble signals into `backtest/engine.py` with OKX fees (taker 0.08%, maker 0.02%)
-- More signal: feature engineering improvements or architecture changes to push precision higher
+- **Design Phase 2 regime layer from scratch** — what features, what model, what gate logic
+- **Per-strategy param grid search** — optimize TP/SL/thresholds for S1, S8 on val
+- **Drop structural failures** — S5/S9/S11/S13 (Sharpe < -20 on both splits)
+- **Cross-asset**: run vol + direction models on ETH and SOL
 
 ---
 
@@ -165,16 +146,24 @@ Walk-forward up_60: **6/6 folds > 0.52**, mean AUC=0.66. Gate to DL stage: PASS.
 data/          loader.py, gaps.py
 features/      orderbook.py, price.py, volume.py, market.py, assembly.py
 models/        splits.py
-               volatility.py       ← done, confusion matrix included
-               direction.py        ← LightGBM done
-               direction_dl.py     ← CNN-LSTM done, DeepLOB ready to run
-               ensemble.py         ← LightGBM + CNN-LSTM weighted ensemble done
-               evaluate.py         ← confusion matrix comparison across all models
-strategy/      agent.py, genetic.py          ← empty stubs
-backtest/      engine.py, costs.py           ← empty stubs
-validation/    walkforward.py                ← empty stub
-cache/         parquet and npy files (gitignored)
-RESEARCH_PROMPT.md   full research agenda with feature/model details
+               volatility.py        ← done (LightGBM ATR)
+               direction.py         ← done (LightGBM)
+               direction_dl.py      ← done (CNN-LSTM two-stage)
+               ensemble.py          ← done (LightGBM + CNN-LSTM)
+               evaluate.py          ← confusion matrix comparison
+strategy/      agent.py             ← S1–S13 signal functions + DEFAULT_PARAMS
+               genetic.py           ← stub (param grid search)
+execution/     entry.py             ← MarketEntry, ConfirmEntry, SpreadEntry
+               exit.py              ← FixedExit, ATRDynamicExit, ComboExit
+               sizing.py            ← FixedFraction, VolScaledSizer
+               config.py            ← EXECUTION_CONFIG per strategy
+backtest/      engine.py            ← bar-by-bar simulator (all exit mechanisms)
+               costs.py             ← OKX fee model
+               run.py               ← strategy backtest runner (no regime gate)
+               preds.py             ← cached vol + direction predictions
+cache/         parquet and npz files (gitignored)
+PLAN.md              phased development plan
+ARCHITECTURE.md      full system diagram with results
 ```
 
 ## Code style

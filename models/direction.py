@@ -75,14 +75,28 @@ _LGB_PARAMS = {
 }
 
 
-def _train(X_tr, y_tr, X_val, y_val):
+def _model_path(ticker: str, label: str) -> Path:
+    return CACHE_DIR / f"{ticker}_direction_lgbm_{label}.txt"
+
+
+def _train(X_tr, y_tr, X_val, y_val, save_path: Path = None):
     ds_tr  = lgb.Dataset(X_tr,  label=y_tr)
     ds_val = lgb.Dataset(X_val, label=y_val, reference=ds_tr)
-    return lgb.train(
+    model = lgb.train(
         _LGB_PARAMS, ds_tr, num_boost_round=500,
         valid_sets=[ds_val],
         callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(-1)],
     )
+    if save_path:
+        model.save_model(str(save_path))
+    return model
+
+
+def _load_or_train(X_tr, y_tr, X_val, y_val, save_path: Path, force: bool = False):
+    if save_path.exists() and not force:
+        print(f"  Loading cached model: {save_path.name}")
+        return lgb.Booster(model_file=str(save_path))
+    return _train(X_tr, y_tr, X_val, y_val, save_path)
 
 
 def _auc(y_true, y_prob):
@@ -151,9 +165,12 @@ def run(ticker: str = "btc"):
                   f"({ok_tr.sum():,} rows)  "
                   f"{fmt(ts_train[0])} → {fmt(ts_train[-1])}")
 
-            # ── STEP 1: train ─────────────────────────────────────────────────
-            model = _train(X_train[ok_tr], y_tr[ok_tr],
-                           X_val[ok_val],  y_v[ok_val])
+            # ── STEP 1: train (or load cached) ───────────────────────────────
+            model = _load_or_train(
+                X_train[ok_tr], y_tr[ok_tr],
+                X_val[ok_val],  y_v[ok_val],
+                save_path=_model_path(ticker, col),
+            )
 
             # ── STEP 2: val analysis ──────────────────────────────────────────
             prob_val = model.predict(X_val[ok_val])

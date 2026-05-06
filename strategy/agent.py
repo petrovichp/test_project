@@ -230,8 +230,8 @@ def strategy_6(df: pd.DataFrame, params: dict) -> tuple:
     Very low signal rate (~3–5%), highest expected precision.
     """
     vp      = params.get("vol_thresh", 0.55)
-    dp_req  = params.get("dir_req",    0.55)    # required direction score
-    dp_opp  = params.get("dir_opp",    0.30)    # max allowed opposite score
+    dp_req  = params.get("dir_req",    0.70)    # required direction score
+    dp_opp  = params.get("dir_opp",    0.20)    # max allowed opposite score
     tp_mult = params.get("tp_mult", 2.0)
     sl_mult = params.get("sl_mult", 1.0)
 
@@ -261,26 +261,257 @@ def strategy_6(df: pd.DataFrame, params: dict) -> tuple:
     return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
 
 
+# ── Strategy 7: OI vs Price Divergence ───────────────────────────────────────
+
+def strategy_7(df: pd.DataFrame, params: dict) -> tuple:
+    """
+    Long when OI rising fast but price falling (short squeeze setup).
+    Short when OI falling fast but price rising (long unwinding).
+    Uses pre-computed oi_price_div_15 feature.
+    """
+    div_sigma   = params.get("div_sigma",  1.5)
+    vol_floor   = params.get("vol_floor",  0.45)
+
+    div_std = df["oi_price_div_15"].rolling(120, min_periods=40).std()
+    div_z   = df["oi_price_div_15"] / (div_std + 1e-12)
+
+    long_cond  = (
+        (div_z              >  div_sigma) &
+        (df["taker_net_15"] >  0) &
+        (df["vol_pred"]     >  vol_floor)
+    ).values
+    short_cond = (
+        (div_z              < -div_sigma) &
+        (df["taker_net_15"] <  0) &
+        (df["vol_pred"]     >  vol_floor)
+    ).values
+
+    tp_pct  = params.get("tp_pct", 0.020)
+    sl_pct  = params.get("sl_pct", 0.007)
+    signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
+
+
+# ── Strategy 8: Sustained Taker Flow Momentum ────────────────────────────────
+
+def strategy_8(df: pd.DataFrame, params: dict) -> tuple:
+    """
+    Sustained taker dominance over 60 bars (institutional accumulation).
+    Different from S5 which fires on single-bar OFI spikes.
+    """
+    taker_sigma = params.get("taker_sigma", 1.0)
+    vol_floor   = params.get("vol_floor",   0.50)
+
+    taker_std  = df["taker_net_60"].rolling(480, min_periods=120).std()
+    taker60_z  = df["taker_net_60"] / (taker_std + 1e-12)
+    taker30_z  = df["taker_net_30"] / (taker_std + 1e-12)
+
+    long_cond  = (
+        (taker60_z          >  taker_sigma) &
+        (taker30_z          >  0.3) &
+        (df["ofi_perp_10"]  >  0) &
+        (df["vol_pred"]     >  vol_floor)
+    ).values
+    short_cond = (
+        (taker60_z          < -taker_sigma) &
+        (taker30_z          < -0.3) &
+        (df["ofi_perp_10"]  <  0) &
+        (df["vol_pred"]     >  vol_floor)
+    ).values
+
+    tp_pct  = params.get("tp_pct", 0.015)
+    sl_pct  = params.get("sl_pct", 0.006)
+    signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
+
+
+# ── Strategy 9: Large Order Imbalance ────────────────────────────────────────
+
+def strategy_9(df: pd.DataFrame, params: dict) -> tuple:
+    """
+    Net large-order imbalance (bid count - ask count) as institutional proxy.
+    Spot leads: when large spot bids dominate, perp should follow.
+    """
+    imb_sigma = params.get("imb_sigma",  1.5)
+    vol_floor = params.get("vol_floor",  0.45)
+
+    spot_net = df["spot_large_bid_count"] - df["spot_large_ask_count"]
+    perp_net = df["perp_large_bid_count"] - df["perp_large_ask_count"]
+
+    spot_std = spot_net.rolling(120, min_periods=30).std()
+    spot_z   = spot_net / (spot_std + 1e-6)
+
+    long_cond  = (
+        (spot_z             >  imb_sigma) &
+        (perp_net           >  0) &
+        (df["vol_pred"]     >  vol_floor)
+    ).values
+    short_cond = (
+        (spot_z             < -imb_sigma) &
+        (perp_net           <  0) &
+        (df["vol_pred"]     >  vol_floor)
+    ).values
+
+    tp_pct  = params.get("tp_pct", 0.020)
+    sl_pct  = params.get("sl_pct", 0.007)
+    signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
+
+
+# ── Strategy 10: Vol Squeeze Breakout ────────────────────────────────────────
+
+def strategy_10(df: pd.DataFrame, params: dict) -> tuple:
+    """
+    bb_width compressed below recent average (squeeze) → breakout on MACD cross.
+    Captures ranging→trending regime transitions.
+    """
+    squeeze_ratio = params.get("squeeze_ratio", 0.65)  # bb_width < X * rolling mean
+
+    bbw_mean     = df["bb_width"].rolling(480, min_periods=120).mean()
+    in_squeeze   = df["bb_width"] < (bbw_mean * squeeze_ratio)
+    recent_squeeze = in_squeeze.rolling(30, min_periods=1).max().astype(bool)
+
+    macd_cross_up   = (df["macd_hist"] > 0) & (df["macd_hist"].shift(1) <= 0)
+    macd_cross_down = (df["macd_hist"] < 0) & (df["macd_hist"].shift(1) >= 0)
+
+    long_cond  = (recent_squeeze & macd_cross_up  & (df["taker_net_15"] > 0)).values
+    short_cond = (recent_squeeze & macd_cross_down & (df["taker_net_15"] < 0)).values
+
+    tp_pct  = params.get("tp_pct", 0.030)
+    sl_pct  = params.get("sl_pct", 0.008)
+    signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
+
+
+# ── Strategy 11: Spot-Perp Basis Momentum ────────────────────────────────────
+
+def strategy_11(df: pd.DataFrame, params: dict) -> tuple:
+    """
+    diff_price z-score (spot ask - perp bid) as basis momentum signal.
+    Expanding basis → futures premium growing → follow direction.
+    Complement to S2 (which fades extremes; this follows into them).
+    """
+    basis_sigma = params.get("basis_sigma", 1.5)
+
+    basis_mean = df["diff_price"].rolling(480, min_periods=120).mean()
+    basis_std  = df["diff_price"].rolling(480, min_periods=120).std()
+    basis_z    = (df["diff_price"] - basis_mean) / (basis_std + 1e-8)
+
+    long_cond  = (
+        (basis_z            >  basis_sigma) &
+        (df["fund_mom_480"] >  0)
+    ).values
+    short_cond = (
+        (basis_z            < -basis_sigma) &
+        (df["fund_mom_480"] <  0)
+    ).values
+
+    tp_pct  = params.get("tp_pct", 0.020)
+    sl_pct  = params.get("sl_pct", 0.007)
+    signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
+
+
+# ── Strategy 12: VWAP Deviation + Volume Confirmation ────────────────────────
+
+def strategy_12(df: pd.DataFrame, params: dict) -> tuple:
+    """
+    Price far from 4h VWAP + high volume + taker turning = overshoot reversion.
+    Fixes S3's weakness (BB alone, no volume confirmation).
+    """
+    vwap_thresh = params.get("vwap_thresh", 0.008)
+    vol_sigma   = params.get("vol_sigma",   1.0)
+    vol_ceil    = params.get("vol_ceil",    0.60)
+
+    # taker imbalance turning (short-window flipping vs longer window)
+    turning_pos = (df["taker_imb_5"] > 0) & (df["taker_imb_30"] < 0)
+    turning_neg = (df["taker_imb_5"] < 0) & (df["taker_imb_30"] > 0)
+
+    long_cond  = (
+        (df["vwap_dev_240"] < -vwap_thresh) &
+        (df["vol_z_spot_60"] >  vol_sigma) &
+        turning_pos &
+        (df["vol_pred"]     <  vol_ceil)
+    ).values
+    short_cond = (
+        (df["vwap_dev_240"] >  vwap_thresh) &
+        (df["vol_z_spot_60"] >  vol_sigma) &
+        turning_neg &
+        (df["vol_pred"]     <  vol_ceil)
+    ).values
+
+    tp_pct  = params.get("tp_pct", 0.015)
+    sl_pct  = params.get("sl_pct", 0.006)
+    signals = np.where(long_cond, 1, np.where(short_cond, -1, 0))
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
+
+
+# ── Strategy 13: Spot/Perp Order Book Divergence ─────────────────────────────
+
+def strategy_13(df: pd.DataFrame, params: dict) -> tuple:
+    """
+    Spot and perp order book imbalances disagree → spot leads, perp follows.
+    When spot bid-heavy but perp ask-heavy: long (perp will catch up).
+    """
+    imb_thresh = params.get("imb_thresh", 0.10)
+
+    spot_buying_perp_selling = (
+        (df["spot_imbalance"] >  imb_thresh) &
+        (df["perp_imbalance"] < -imb_thresh) &
+        (df["taker_imb_5"]   >  0)
+    )
+    spot_selling_perp_buying = (
+        (df["spot_imbalance"] < -imb_thresh) &
+        (df["perp_imbalance"] >  imb_thresh) &
+        (df["taker_imb_5"]   <  0)
+    )
+
+    tp_pct  = params.get("tp_pct", 0.015)
+    sl_pct  = params.get("sl_pct", 0.005)
+    signals = np.where(spot_buying_perp_selling.values, 1,
+               np.where(spot_selling_perp_buying.values, -1, 0))
+    return signals, np.full(len(signals), tp_pct), np.full(len(signals), sl_pct)
+
+
 # ── registry ──────────────────────────────────────────────────────────────────
 
 STRATEGIES = {
-    "S1_VolDir":    (strategy_1, "Volatility-Filtered Direction"),
-    "S2_Funding":   (strategy_2, "Funding Rate Mean-Reversion"),
-    "S3_BBRevert":  (strategy_3, "Bollinger Band Mean-Reversion"),
-    "S4_MACDTrend": (strategy_4, "MACD + SMA Trend Following"),
-    "S5_OFIScalp":  (strategy_5, "OFI Momentum Scalp"),
-    "S6_TwoSignal": (strategy_6, "Two-Signal High-Precision"),
+    "S1_VolDir":    (strategy_1,  "Volatility-Filtered Direction"),
+    "S2_Funding":   (strategy_2,  "Funding Rate Mean-Reversion"),
+    "S3_BBRevert":  (strategy_3,  "Bollinger Band Mean-Reversion"),
+    "S4_MACDTrend": (strategy_4,  "MACD + SMA Trend Following"),
+    "S6_TwoSignal": (strategy_6,  "Two-Signal High-Precision"),
+    "S7_OIDiverg":  (strategy_7,  "OI vs Price Divergence"),
+    "S8_TakerFlow": (strategy_8,  "Sustained Taker Flow Momentum"),
+    "S10_Squeeze":  (strategy_10, "Vol Squeeze Breakout"),
+    "S12_VWAPVol":  (strategy_12, "VWAP Deviation + Volume"),
+    # Killed (Sharpe < -20 on both splits, no recoverable signal):
+    #   S5_OFIScalp, S9_LargeOrd, S11_Basis, S13_OBDiv
+    # Strategy functions kept in this file as dead code for reference.
 }
 
 DEFAULT_PARAMS = {
-    # tp_pct / sl_pct are fractions of entry price (e.g. 0.008 = 0.8%)
-    # Label threshold = 0.008 → TP set at or near that, SL below
-    "S1_VolDir":    {"vol_thresh": 0.60, "dir_thresh": 0.50, "tp_pct": 0.010, "sl_pct": 0.004},
-    "S2_Funding":   {"fund_z_thresh": 2.0,                   "tp_pct": 0.012, "sl_pct": 0.005},
-    "S3_BBRevert":  {"vol_ceil": 0.50, "ofi_thresh": 0.0,    "tp_pct": 0.008, "sl_pct": 0.003},
-    "S4_MACDTrend": {"vol_thresh": 0.60, "dir_thresh": 0.45,
-                     "sma_dev": 0.002,                        "tp_pct": 0.015, "sl_pct": 0.005},
-    "S5_OFIScalp":  {"ofi_sigma": 2.0, "vol_floor": 0.40,   "tp_pct": 0.006, "sl_pct": 0.003},
-    "S6_TwoSignal": {"vol_thresh": 0.55, "dir_req": 0.55,
-                     "dir_opp": 0.30,                         "tp_pct": 0.012, "sl_pct": 0.004},
+    # tp_pct / sl_pct are fractions of entry price
+    # trail_pct: trailing SL ratchets below running price peak (0 = fixed SL — use for mean-reversion)
+    # Momentum strategies (S1, S4, S6): trail_pct = sl_pct (ratchet locks in gains on runners)
+    # Mean-reversion strategies (S2, S3): trail_pct = 0 (price overshoots then returns; trail exits early)
+    # breakeven precision ≈ sl / (tp + sl - 0.0016 fees)
+    "S1_VolDir":    {"vol_thresh": 0.60, "dir_thresh": 0.75,   # dir raised 0.70→0.75
+                     "tp_pct": 0.020, "sl_pct": 0.007, "trail_pct": 0.007},
+    "S2_Funding":   {"fund_z_thresh": 2.0,                     # mean-reversion: no trail
+                     "tp_pct": 0.020, "sl_pct": 0.007, "trail_pct": 0.0},
+    "S3_BBRevert":  {"vol_ceil": 0.50, "ofi_thresh": 0.0,      # mean-reversion: no trail
+                     "tp_pct": 0.015, "sl_pct": 0.005, "trail_pct": 0.0},
+    "S4_MACDTrend": {"vol_thresh": 0.60, "dir_thresh": 0.70, "sma_dev": 0.002,
+                     "tp_pct": 0.025, "sl_pct": 0.008, "trail_pct": 0.008},
+    "S6_TwoSignal": {"vol_thresh": 0.55, "dir_req": 0.70, "dir_opp": 0.20,
+                     "tp_pct": 0.025, "sl_pct": 0.008, "trail_pct": 0.008},
+    "S7_OIDiverg":  {"div_sigma": 1.5, "vol_floor": 0.45,
+                     "tp_pct": 0.020, "sl_pct": 0.007, "trail_pct": 0.0},
+    "S8_TakerFlow": {"taker_sigma": 1.0, "vol_floor": 0.50,
+                     "tp_pct": 0.015, "sl_pct": 0.006, "trail_pct": 0.005},
+    "S10_Squeeze":  {"squeeze_ratio": 0.65,
+                     "tp_pct": 0.030, "sl_pct": 0.008, "trail_pct": 0.010},
+    "S12_VWAPVol":  {"vwap_thresh": 0.008, "vol_sigma": 1.0, "vol_ceil": 0.60,
+                     "tp_pct": 0.015, "sl_pct": 0.006, "trail_pct": 0.0},
 }

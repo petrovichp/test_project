@@ -1,0 +1,53 @@
+"""
+DQN network — 3-layer MLP, ~5,674 params.
+
+Topology (matches v5 spec):
+  state(50) → Linear→ReLU(64) → Linear→ReLU(32) → Linear(10) → Q-values
+
+Action masking happens AFTER the network forward, before any argmax/max/softmax:
+  q[~valid] = -1e9  (avoids NaN propagation that -inf would cause)
+
+Two networks are used in training: online + target. Hard sync every K steps.
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class DQN(nn.Module):
+    def __init__(self, state_dim: int = 50, n_actions: int = 10, hidden: int = 64):
+        super().__init__()
+        self.state_dim = state_dim
+        self.n_actions = n_actions
+        self.fc1 = nn.Linear(state_dim, hidden)
+        self.fc2 = nn.Linear(hidden, hidden // 2)
+        self.fc3 = nn.Linear(hidden // 2, n_actions)
+        # Kaiming-uniform default fits ReLU; no special init needed.
+        # No BatchNorm, no Dropout — small net, off-policy sampling.
+
+    def forward(self, s: torch.Tensor) -> torch.Tensor:
+        x = F.relu(self.fc1(s))
+        x = F.relu(self.fc2(x))
+        return self.fc3(x)                # raw logits (Q-values), shape (B, n_actions)
+
+    def n_params(self) -> int:
+        return sum(p.numel() for p in self.parameters())
+
+
+def masked_argmax(net: DQN, state: torch.Tensor,
+                   valid_actions_mask: torch.Tensor) -> torch.Tensor:
+    """Inference path. valid_actions_mask: (B, n_actions) bool."""
+    with torch.no_grad():
+        q = net(state)
+        q = q.masked_fill(~valid_actions_mask, -1e9)
+        return q.argmax(dim=-1)
+
+
+def masked_max(target_net: DQN, state_next: torch.Tensor,
+                valid_mask_next: torch.Tensor) -> torch.Tensor:
+    """Bellman-target path. Returns max Q over valid actions only."""
+    with torch.no_grad():
+        q_next = target_net(state_next)
+        q_next = q_next.masked_fill(~valid_mask_next, -1e9)
+        return q_next.max(dim=-1).values

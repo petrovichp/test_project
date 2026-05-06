@@ -5,7 +5,14 @@
       "Bash(gh repo *)",
       "Bash(python3 -c ' *)",
       "Bash(python3)",
-      "Bash(python3 /tmp/btc_analysis.py)"
+      "Bash(python3 /tmp/btc_analysis.py)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "WebFetch(domain:www.okx.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }

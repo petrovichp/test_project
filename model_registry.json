@@ -204,5 +204,23 @@
     "w_cnn": 0.511,
     "atr_feature": true,
     "trained_at": "2026-05-04T17:15:54.147985"
+  },
+  "btc_backtest": {
+    "run_at": "2026-05-06T09:27:40.890893",
+    "vol_model": "btc_lgbm_atr_30",
+    "dir_model": "btc_cnn2s_dir",
+    "train_start": "2025-07-05",
+    "train_end": "2025-10-02",
+    "val_start": "2025-10-02",
+    "val_end": "2025-12-26",
+    "test_start": "2025-12-26",
+    "test_end": "2026-04-25",
+    "train_rows": 70902,
+    "val_rows": 35451,
+    "test_rows": 35451,
+    "n_features": 191,
+    "best_val_strategy": "S8_TakerFlow",
+    "best_val_sharpe": 5.829,
+    "phase1_gate_pass": true
   }
 }

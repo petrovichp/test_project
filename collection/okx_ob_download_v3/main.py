@@ -133,10 +133,10 @@ class OKX:
         return self.get("/api/v5/rubik/stat/taker-volume-contract",
                         {"instId": inst_id, "period": period, "unit": "0", "limit": 2})
 
-    def liquidations(self, inst_id: str, limit: int = 100) -> dict:
+    def liquidations(self, underlying: str, limit: int = 100) -> dict:
+        # uly = e.g. "BTC-USDT" (strip -SWAP suffix)
         return self.get("/api/v5/public/liquidation-orders",
-                        {"instType": "SWAP", "instId": inst_id,
-                         "state": "filled", "limit": limit})
+                        {"instType": "SWAP", "uly": underlying, "limit": limit})
 
     def ls_ratio_all(self, inst_id: str, period: str = "5m") -> dict:
         return self.get("/api/v5/rubik/stat/contracts/long-short-account-ratio-contract",
@@ -318,8 +318,12 @@ def okx_ob_download_v3(request):
         d_sell_perp, d_buy_perp = deal_imbalance(okx, PERP)
 
         # ── liquidations ──────────────────────────────────────────────────
-        liq_data = liquidation_stats(okx.liquidations(PERP, limit=100),
-                                     windows_ms=[5*60_000, 15*60_000])
+        try:
+            liq_raw = okx.liquidations(SPOT, limit=100)   # SPOT = "BTC-USDT" (the uly)
+            liq_data = liquidation_stats(liq_raw, windows_ms=[5*60_000, 15*60_000])
+        except Exception:
+            liq_data = {"liq_long_5m": 0.0, "liq_short_5m": 0.0,
+                        "liq_long_15m": 0.0, "liq_short_15m": 0.0}
 
         # ── long/short ratios ─────────────────────────────────────────────
         ls_all      = latest_ls_ratio(okx.ls_ratio_all(PERP))
