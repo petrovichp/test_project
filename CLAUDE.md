@@ -1,7 +1,7 @@
 # Crypto Trading ML — Project Context
 
 > **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md).**
-> Latest finding: DQN entry-gating works at OKX maker fees (val Sharpe +1.72); fails at taker fees. Production path is maker-only execution.
+> Latest findings: (1) DQN entry-gating works at OKX maker fees (Group A4 val Sharpe +1.72). (2) DQN exit-timing does **not** lift over rule-based exits (Group B closed; Group C dropped). Production path is maker-only execution with A4 entry policy.
 
 ## What this project is
 
@@ -42,6 +42,8 @@ models/
   dqn_rollout.py            env-loop driver  (--fee --trade-penalty)
   dqn_selector.py           DQN training loop
   group_a_sweep.py          fee × penalty sweep runner
+  exit_dqn.py               Group B: 28-dim in-trade state, HOLD/EXIT_NOW + rule-based exits
+  group_b_sweep.py          Group B 12-cell runner (3 global × fee + 9 per-strategy)
   walk_forward.py           6-fold validation
   grid_search.py            hyperparameter search
   pnl_predictor.py          supervised PnL regression diagnostic

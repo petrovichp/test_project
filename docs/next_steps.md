@@ -1,6 +1,6 @@
 # Experiments Remaining + Next Steps
 
-Forward-looking plan after Group A breakthrough. Companion to [RESULTS.md](../RESULTS.md) and [experiments_log.md](experiments_log.md).
+Forward-looking plan after Group A breakthrough and Group B closeout. Companion to [RESULTS.md](../RESULTS.md) and [experiments_log.md](experiments_log.md).
 
 ---
 
@@ -8,29 +8,39 @@ Forward-looking plan after Group A breakthrough. Companion to [RESULTS.md](../RE
 
 | ID | Experiment | Effort | Status |
 |---|---|---|---|
-| **Group B** | Exit-timing DQN (4 cells) | ~1.5–2 days | not started — see below |
-| **Group C** | Stacked entry+exit RL (2 cells) | ~3–5 days | conditional on B success |
-| **Reduced scope** | Lock A4 (walk-forward + seed variance + penalty fine-grid) | ~1 day | recommended before Group B |
+| **Reduced scope** | Lock A4 (walk-forward + seed variance + penalty fine-grid) | ~1 day | **recommended next** |
 | **Path X** | Maker-only execution scoping | ~3–5 days | production deployment path |
-| **Alternative pivots** | Funding-rate / vol trading / statarb | open-ended | only if Groups B/C don't deliver |
+| **Alternative pivots** | Funding-rate / vol trading / statarb / cross-timeframe | open-ended | if A4 + Path X insufficient |
+| ~~Group B~~ | ~~Exit-timing DQN~~ | — | **closed 2026-05-07: no lift over rule-based exits, see below** |
+| ~~Group C~~ | ~~Stacked entry+exit RL~~ | — | **dropped (was conditional on B clearing +4-Sharpe gate)** |
 
-Detailed breakdowns of each experiment in the sections below.
-
----
-
-## Decision Tree
-
-```
-              ┌─ deployment first ─→ Reduced scope (1 day) → Path X (3-5 days) → paper-trade
-              │
-Where now? ───┤
-              │
-              └─ research first ───→ Group B (1.5-2d) → if wins → Group C (3-5d) → deploy best
-```
+Detailed breakdowns of each remaining experiment in the sections below; Group B / C summaries kept for the record.
 
 ---
 
-## Group B — Exit-timing DQN (~1.5–2 days)
+## Decision Tree (post-Group-B)
+
+```
+Step 1: Reduced scope (~1 day)
+        ├─ Walk-forward A4 across 6 RL folds
+        ├─ Seed variance (5 seeds)
+        └─ Penalty fine-grid at fee=0.0004
+        ↓
+Step 2: A4 stable?  ── yes → Path X (3-5 days) → paper-trade → live
+                    └─ no  → pivot (funding-rate / vol / statarb)
+```
+
+---
+
+## Group B — closed (no lift)
+
+Tested in May 2026: 12 cells (3 global × fee level + 9 per-strategy at maker). Verdict: rule-based exits (TP / SL / BE / trail / time-stop) already capture the bulk of per-trade alpha; RL exit-timing on top of them gave **mean Δ +0.6 Sharpe (best +1.97)** in the best per-strategy case, well below the +4-Sharpe gate set as the success criterion. Pooled global exit DQN (B1-B3) was actively negative at every fee level. **Group C was conditional on B clearing the gate and is dropped.** Full numbers in [experiments_log.md § Group B](experiments_log.md#group-b--exit-timing-dqn).
+
+Lesson: the +28-Sharpe oracle gap most likely lives in *intra-bar entry timing* (sub-1-minute resolution that the current architecture cannot see), not in exit selection. Future exit work would need a different formulation than HOLD/EXIT_NOW (e.g., dynamic SL placement, signal-driven exit thresholds inside the strategies themselves).
+
+---
+
+## Group B (original spec, kept for reference) — Exit-timing DQN
 
 **Question:** can RL replace fixed TP/SL/BE/trail and capture part of the ~14-Sharpe oracle gap?
 
@@ -77,9 +87,9 @@ Training time per cell: ~10 min. Total: ~40 min.
 
 ---
 
-## Group C — Stacked entry+exit RL (~3–5 days, conditional)
+## Group C (dropped) — Stacked entry+exit RL
 
-**Only run if Group A and Group B both win.**
+**Was conditional on Group B success. Group B did not clear its gate, so C is dropped.** The original spec is kept below for the record.
 
 | ID | Variant | Tests |
 |---|---|---|
@@ -165,36 +175,35 @@ Only if Groups B/C don't move the needle and A4 alone isn't enough for productio
 
 ---
 
-## Recommended sequencing
+## Recommended sequencing (post-Group-B)
 
 ```
-Step 1: Group A reduced scope (~1 day)
-        ├─ Walk-forward A4
+Step 1: Reduced scope (~1 day) — lock A4
+        ├─ Walk-forward A4 across 6 RL folds
         ├─ Penalty fine-grid at fee=0.0004
-        └─ A4 seed variance
+        └─ A4 seed variance (5 seeds)
         ↓
 Step 2: Decision
-        ├─ A4 is solid → start Path X scoping in parallel with Group B
-        └─ A4 is fragile → drop A4, pivot to Group B exclusively
+        ├─ A4 walk-forward ≥4/6 positive AND seed std < 1.0 → Path X
+        └─ A4 fragile                                       → pivot to alt alpha
         ↓
-Step 3a: Path X (~4-5 days) — production scoping if A4 solid
-Step 3b: Group B (~1.5-2 days) — exit-timing RL
+Step 3: Path X (~4-5 days) — maker execution layer + paper-trade
         ↓
-Step 4: Decision
-        ├─ Both Path X + Group B succeed → deploy Group A4 + plan Group C
-        ├─ Path X works, Group B doesn't → deploy A4-only
-        ├─ Path X fails (maker fill rate too low) → drop deployment, focus on Group B+C alphas
-        └─ Group B works alone → deploy with default entries + RL exits
+Step 4: Live with A4 entry + rule-based exits.
+        Optional: bolt on B4 per-strategy exit DQNs (+0.6 mean Sharpe lift)
+        once entry stack is stable.
 ```
 
 ---
 
 ## Open questions (research only — not blockers)
 
-1. **Why does the DQN concentrate 95-98% on NO_TRADE across all cells?** Mask coverage allows trades on ~30% of bars. The DQN being more selective than the mask is a feature, but the magnitude is striking.
+1. **Why does the entry DQN concentrate 95-98% on NO_TRADE across all cells?** Mask coverage allows trades on ~30% of bars. The DQN being more selective than the mask is a feature, but the magnitude is striking.
 
 2. **Why does penalty help at fee=0 but hurt at fee=0.0004?** Suggests the optimal selectivity threshold is fee-dependent and roughly compensates for fees. Could formalize as a reward-shaping theory.
 
 3. **Does the prior CUSUM gate +3.13 result (CLAUDE.md) replicate at all?** Walk-forward (D3) showed S4+CUSUM mean −3.13 across folds. Either the original was a single-window artifact or there's a difference in evaluation pipeline.
 
-4. **What's the ceiling on entry-gating?** A2 gives +7.30 fee-free. Oracle gives +35.68 fee-free. Where is the +28-Sharpe gap from? Likely 90%+ from exits (Group B) and the rest from per-bar entry timing (intra-bar precision, not addressed here).
+4. **Where does the residual +28-Sharpe oracle gap live?** A2 gives +7.30 fee-free; oracle gives +35.68 fee-free. Group B confirmed it's *not* in HOLD/EXIT_NOW exit selection (best lift +1.97, well short of +28). Most plausible: intra-bar entry timing — picking the *right second* within a 1-minute bar to enter, which the current architecture cannot resolve.
+
+5. **Why does pooled exit DQN underperform per-strategy exit DQN by a wide margin?** B2 Δ −4.23 (pooled), B4 mean Δ +0.6. Strategies must have heterogeneous exit signatures the shared policy cannot disentangle. Possibly a per-strategy embedding in the state would let one network share parameters while specializing.

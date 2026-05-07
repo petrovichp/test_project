@@ -1,6 +1,6 @@
 # Crypto Trading ML — Results & Conclusions
 
-> **Status (2026-05-06):** breakthrough finding. RL entry-gating produces deployable Sharpe at maker fees. Production path scoped (Path X). Group B (exit-timing RL) and Group C (stacked RL) remain to explore.
+> **Status (2026-05-07):** RL entry-gating works at maker fees (Group A4: val Sharpe **+1.72**). RL exit-timing tested and **does not lift over rule-based exits** (Group B closed; Group C dropped). Production path remains maker-only execution (Path X) with A4 entry policy.
 
 ---
 
@@ -15,6 +15,7 @@
    - [Group D — Failure diagnostics](#group-d--failure-diagnostics-clarified-cause)
    - [Path 1 — Root cause diagnostics](#path-1--root-cause-diagnostics-key-insight)
    - [Group A — Fee × penalty sweep](#group-a--fee--penalty-sweep-breakthrough)
+   - [Group B — Exit-timing DQN](#group-b--exit-timing-dqn-no-lift)
 5. [Cumulative Insights](#cumulative-insights)
 6. [Production Readiness](#production-readiness)
 7. [Files & Artifacts](#files--artifacts)
@@ -196,6 +197,42 @@ Retrained DQN at 7 (fee, penalty) cells. ~25 minutes total wall time.
 
 ---
 
+### Group B — Exit-timing DQN (NO LIFT)
+
+Tested whether a 28-dim in-trade state DQN with HOLD/EXIT_NOW actions can improve over rule-based exits (TP/SL/BE/trail/time-stop). 12 cells total: 3 global × fee level + 9 per-strategy at maker fee. Modules: [models/exit_dqn.py](models/exit_dqn.py), [models/group_b_sweep.py](models/group_b_sweep.py).
+
+**Global exit DQN (B1-B3) — single shared policy across all 9 strategies:**
+
+| Cell | Fee | Baseline (rule-only) | RL exit | ΔSharpe |
+|---|---|---|---|---|
+| B1 | 0.0008 (taker) | −14.91 | **−22.46** | **−7.55** |
+| B2 | 0.0004 (maker) | −6.81 | **−11.04** | **−4.23** |
+| B3 | 0 (fee-free) | +3.79 | **+2.27** | **−1.52** |
+
+All three negative. Pooling heterogeneous strategies into one exit DQN actively hurts.
+
+**Per-strategy exit DQN (B4) at maker fee — one DQN per entry strategy:**
+
+| Strategy | Baseline | RL exit | ΔSharpe |
+|---|---|---|---|
+| S1_VolDir | −4.66 | −4.05 | +0.61 |
+| S2_Funding | −4.47 | −3.51 | +0.96 |
+| S3_BBRevert | −22.41 | −21.40 | +1.00 |
+| **S4_MACDTrend** | **−4.23** | **−2.66** | **+1.57** |
+| S6_TwoSignal | −7.30 | −7.41 | −0.11 |
+| S7_OIDiverg | −9.72 | −9.81 | −0.08 |
+| **S8_TakerFlow** | **−5.06** | **−3.09** | **+1.97** |
+| S10_Squeeze | −7.88 | −8.20 | −0.33 |
+| S12_VWAPVol | +3.22 | +3.22 | 0 (n=1) |
+
+**6/9 positive, mean Δ ≈ +0.6, best +1.97 (S8_TakerFlow).** Per-strategy is consistently better than pooled, but the lift is too small to clear the +4-Sharpe gate from [docs/next_steps.md](docs/next_steps.md). None of the strategies become profitable at maker fee even with their own exit DQN.
+
+**Decision:** Group B closed as a non-improvement. **Group C (stacked entry+exit RL) is dropped** — it was conditional on B clearing the gate. Rule-based exits already capture the bulk of per-trade alpha. The +28 Sharpe oracle gap is most likely intra-bar entry timing (sub-1-minute), which the current architecture cannot address.
+
+→ Detailed log: [docs/experiments_log.md#group-b](docs/experiments_log.md#group-b--exit-timing-dqn)
+
+---
+
 ## Cumulative Insights
 
 ### What's confirmed
@@ -209,9 +246,9 @@ Retrained DQN at 7 (fee, penalty) cells. ~25 minutes total wall time.
 ### What's still unknown
 1. **Walk-forward stability of A4** at maker fee. Group A val/test result is one window.
 2. **Seed sensitivity** of A4 — how robust is the +1.72?
-3. **Whether RL can replace TP/SL with better-than-fixed exits** (Group B).
-4. **Whether stacked entry+exit RL composes cleanly** (Group C).
-5. **Real-world fill rates** for maker orders (production scoping).
+3. **Real-world fill rates** for maker orders (production scoping).
+4. ~~Whether RL can replace TP/SL with better-than-fixed exits~~ **Resolved (Group B): no, mean lift +0.6 Sharpe, doesn't clear +4 gate.**
+5. ~~Whether stacked entry+exit RL composes cleanly~~ **Group C dropped (was conditional on B success).**
 
 ---
 
@@ -267,6 +304,8 @@ Retrained DQN at 7 (fee, penalty) cells. ~25 minutes total wall time.
 | [models/dqn_rollout.py](models/dqn_rollout.py) | Env-loop driver, fee + penalty parameterized |
 | [models/dqn_selector.py](models/dqn_selector.py) | Training loop, CLI: `--fee --trade-penalty` |
 | [models/group_a_sweep.py](models/group_a_sweep.py) | Group A 7-cell runner |
+| [models/exit_dqn.py](models/exit_dqn.py) | Exit-timing DQN (Group B): 28-dim in-trade state, HOLD/EXIT_NOW, RL+rule-based exits combined |
+| [models/group_b_sweep.py](models/group_b_sweep.py) | Group B 12-cell runner (B1-B3 global × fee, B4 per-strategy) |
 | [models/grid_search.py](models/grid_search.py) | Hyperparameter search |
 | [models/walk_forward.py](models/walk_forward.py) | 6-fold validation |
 | [models/diagnostics_ab.py](models/diagnostics_ab.py) | Path 1a (fee-free) + 1b (oracle) |
@@ -297,6 +336,11 @@ cache/
   btc_dqn_train_history_A{0..6}.json
   btc_dqn_groupA_summary.{parquet,json}
 
+  ── exit DQN policies (Group B) ──
+  btc_exit_dqn_policy_{B1,B2,B3,B4_S0..S8}.pt
+  btc_exit_dqn_history_{B1,B2,B3,B4_S0..S8}.json
+  btc_exit_dqn_groupB_summary.json
+
   ── diagnostics ──
   btc_diag_1a_fee_free.parquet
   btc_diag_1b_oracle.parquet
@@ -321,9 +365,10 @@ Quick summary of remaining experiments:
 
 | ID | Experiment | Effort | Status |
 |---|---|---|---|
-| Group B | Exit-timing DQN (4 cells) | ~1.5–2 days | not started |
-| Group C | Stacked entry+exit RL | ~3–5 days | conditional on B |
-| Reduced scope | Lock A4 (walk-forward + seed + penalty fine-grid) | ~1 day | recommended before B |
-| Path X | Maker-only execution | ~3–5 days | production deployment |
+| ~~Group B~~ | ~~Exit-timing DQN~~ | — | **done — no lift, closed 2026-05-07** |
+| ~~Group C~~ | ~~Stacked entry+exit RL~~ | — | **dropped (was conditional on B)** |
+| Reduced scope | Lock A4 (walk-forward + seed + penalty fine-grid) | ~1 day | recommended before deployment |
+| Path X | Maker-only execution | ~3–5 days | **next: production deployment** |
+| Alternative pivots | Funding-rate / vol trading / statarb | open-ended | optional if A4 alone insufficient |
 
-The recommended next move depends on whether you want **deployment first** (Path X + A4 mini-validation) or **research first** (Group B + C, then deploy the best).
+With Groups B/C closed, the path forward is clear: **lock A4 (reduced scope), then build Path X (maker execution)**. Per-strategy exit DQNs (B4) provide a small optional lift (~+0.6 mean Sharpe) and could be bolted onto a deployed system later if entries are stable.

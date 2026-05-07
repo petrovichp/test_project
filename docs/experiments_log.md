@@ -330,4 +330,58 @@ All approaches negative under taker fees.
 | DQN entry-gating + 0.3% penalty (A3) | +5.82 |
 | Oracle (perfect exit, fee-free) | +35.68 |
 
-DQN adds +3.5 to +5 Sharpe over passive. Oracle ceiling +28 above DQN — exit-timing RL (Group B) is the next lever.
+DQN adds +3.5 to +5 Sharpe over passive. Oracle ceiling +28 above DQN — but exit-timing RL (Group B) failed to close that gap (see below).
+
+---
+
+## Group B — Exit-timing DQN
+
+- **Module:** [models/exit_dqn.py](../models/exit_dqn.py)  +  [models/group_b_sweep.py](../models/group_b_sweep.py)
+- **Total runtime:** ~12 min (3 global cells ~2.5 min, 9 per-strategy cells ~9.5 min)
+
+### Formulation
+
+Within each in-trade bar, a 28-dim state is built and the DQN chooses HOLD / EXIT_NOW. Rule-based exits (TP / SL / BE / trail / time-stop) stay active in parallel; whichever fires first ends the trade. Sparse terminal reward (realized PnL net of fees), γ=1.0 within episode (bounded ≤240 bars). Buffer fills via HOLD-biased random exploration (10% EXIT_NOW) so warmup contains full trade trajectories with rule-fired terminals.
+
+Network: 28 → 64 → 32 → 2 (4,002 params). Buffer 80k, batch 128, LR 1e-3, 80k grad steps max with 16k early-stop patience.
+
+### B1-B3 — Global exit DQN across fee levels
+
+Single shared exit policy for all entries (sequential, first-firing strategy at each bar).
+
+| Cell | Fee | Baseline (rule-only) | RL exit | ΔSharpe | Best step | RLexit% | Trades |
+|---|---|---|---|---|---|---|---|
+| B1 | 0.0008 (taker) | −14.911 | **−22.459** | **−7.55** | 4,000 | 33.5% | 531 |
+| B2 | 0.0004 (maker) | −6.810 | **−11.042** | **−4.23** | 20,000 | 31.6% | 512 |
+| B3 | 0.0000 (fee-free) | +3.793 | **+2.270** | **−1.52** | 4,000 | 54.8% | 683 |
+
+All three cells negative. Pooling 9 strategies' entries into one exit DQN actively hurts even at fee=0 — strategies have heterogeneous exit signatures the shared policy cannot resolve.
+
+### B4 — Per-strategy exit DQN at maker fee
+
+One DQN per entry strategy (9 sub-runs), each trained only on that strategy's entries.
+
+| Cell | Strategy | Baseline | RL exit | ΔSharpe | Trades | RLexit% |
+|---|---|---|---|---|---|---|
+| B4_S0 | S1_VolDir    | −4.656  | −4.050  | **+0.606** | 227 | 5.3% |
+| B4_S1 | S2_Funding   | −4.467  | −3.510  | **+0.957** | 54  | 40.7% |
+| B4_S2 | S3_BBRevert  | −22.407 | −21.403 | **+1.004** | 205 | 12.7% |
+| B4_S3 | S4_MACDTrend | −4.228  | **−2.659** | **+1.568** | 119 | 42.9% |
+| B4_S4 | S6_TwoSignal | −7.301  | −7.414  | −0.112     | 154 | 33.8% |
+| B4_S5 | S7_OIDiverg  | −9.725  | −9.809  | −0.085     | 508 | 27.2% |
+| B4_S6 | S8_TakerFlow | −5.055  | **−3.086** | **+1.970** | 245 | 38.8% |
+| B4_S7 | S10_Squeeze  | −7.875  | −8.201  | −0.326     | 374 | 36.1% |
+| B4_S8 | S12_VWAPVol  | +3.216  | +3.216  | +0.000 (n=1) | 1 | — |
+
+**6/9 positive Δ; best +1.97 (S8_TakerFlow), mean ≈ +0.6.** Per-strategy exit DQNs reliably extract a small lift, but none lift any single strategy into profitable territory at maker fee.
+
+### Decision (per [next_steps.md](next_steps.md) gate)
+
+The +4-Sharpe gate ("captures ≥30% of actual-vs-oracle gap") was not cleared:
+- Best B4 lift +1.97 << +4
+- B1-B3 negative
+- Group C (stacked entry+exit RL, conditional on B success) is dropped
+
+Rule-based exits already capture the bulk of the per-trade alpha. Future exit improvements would require a different formulation (e.g., per-bar dynamic SL placement rather than binary HOLD/EXIT, or signal-driven exit thresholds inside the strategies themselves). The +28 Sharpe oracle gap remains unclaimed; most of it likely lives in *intra-bar entry timing* (which the DQN cannot see at 1-min resolution) rather than exit selection.
+
+**Production implication:** stick with rule-based exits and Group A4 entry DQN. B4 per-strategy exits provide a small optional lift (~+0.5 mean) but add 9× more model artefacts to maintain — only worth deploying if the entry stack is already locked.
