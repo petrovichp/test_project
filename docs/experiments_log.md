@@ -695,3 +695,60 @@ On strategies that produce TP-friendly trade trajectories (the majority, in fold
 **Deployment target: A2 entry + rule-based exits.** Walk-forward 6/6 positive, mean Sharpe +9.00, robust across the full RL period.
 
 C2_fix240 (A2 + B5 RL exits) is closed as a production candidate but retains optional value as a regime-stress fallback or future research direction (joint hierarchical training).
+
+---
+
+## Trail-after-breakeven extension to mean-reversion strategies (negative result, 2026-05-07)
+
+### Hypothesis
+
+Currently 5/9 strategies have `trail_after_breakeven=True` in [execution/config.py](../execution/config.py): S1, S4, S6, S8, S10 (the trend strategies). The other 4 — **S2_Funding, S3_BBRevert, S7_OIDiverg, S12_VWAPVol** (mean-reversion) — only have `breakeven` (SL moves to entry once profitable) but no subsequent trail. Enabling trail-after-BE for those 4 *might* lock in additional partial profits and lift Sharpe.
+
+### Experiment
+
+Set `trail_after_breakeven=True` for the four mean-reversion strategies. Trail distance auto-defaults to each strategy's `sl_pct` (S2=0.5%, S3=0.4%, S7=0.5%, S12=0.6%) per `ComboExit.plan()` logic. Re-ran walk-forward across 6 RL folds.
+
+### Result — degradation
+
+| Fold | Baseline (no TAB on mean-rev) | With TAB on S2/S3/S7/S12 | Δ |
+|---|---|---|---|
+| 1 | +13.079 | +13.084 | +0.005 |
+| 2 | **+14.820** | **+12.844** | **−1.976** |
+| 3 | +6.172 | +6.220 | +0.048 |
+| 4 | +9.343 | +9.551 | +0.208 |
+| 5 | **+8.139** | **+7.108** | **−1.031** |
+| 6 | +2.457 | +2.568 | +0.111 |
+| **Aggregate** | **+9.001** | **+8.562** | **−0.439** |
+
+Folds 1, 3, 4, 6: roughly neutral (±0.2). Folds 2 and 5 lose 1-2 Sharpe each, dragging the mean down by 0.44.
+
+### Why it hurt
+
+The four affected strategies are all **mean-reversion** in nature. Their trade trajectory is fundamentally different from trend strategies:
+
+- **Trend strategy (e.g., S1_VolDir):** price climbs monotonically, peaks, retraces. Trail-after-BE locks in the peak — wins.
+- **Mean-reversion strategy (e.g., S3_BBRevert):** price moves toward a *target* (e.g., Bollinger band center, fair-value VWAP). Trajectory is non-monotonic — price often overshoots in the entry direction, retraces past breakeven, then continues to the reversion target. The trail prematurely exits during the retrace **before the reversion completes**.
+
+Concrete example for S3_BBRevert:
+- Entry at lower BB at $100 (long, expecting reversion to mean $101)
+- Price moves to $100.50 (+0.5% — BE triggers, SL moves to $100, trail activates at 0.4%)
+- Price retraces to $100.10 → trail-SL = max($100, $100.50 × 0.996) = $100.098
+- Price drops to $99.95 → hits trail-SL at $100.098 → **exits at +0.10%**
+- ...but had the trade held, price would continue mean-reversion to $101 → **+1.0%**
+
+The trail mechanism assumes "post-profit retrace = bad signal" (correct for trend), but for mean-reversion a small retrace is normal price discovery, not a thesis reversal. The original config decision to leave mean-reversion strategies without trail was principled.
+
+### Decision
+
+**Reverted.** `execution/config.py` restored to original 5/9 `trail_after_breakeven=True` distribution. Lesson preserved here for the record.
+
+### Lesson for future tuning
+
+Exit mechanics need to match the strategy's signal type:
+
+| Strategy type | Best exit mechanism |
+|---|---|
+| **Trend / momentum** (signal continues) | TP + breakeven + **trail-after-BE** |
+| **Mean-reversion** (signal targets a level) | TP + breakeven (no trail) + time-stop |
+
+This is already encoded in the existing config — confirmed correct by walk-forward.
