@@ -1,6 +1,6 @@
 # Crypto Trading ML — Project Context
 
-> **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md), [docs/data_splits.md](docs/data_splits.md), [docs/a2_rule_audit.md](docs/a2_rule_audit.md).**
+> **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md), [docs/data_splits.md](docs/data_splits.md), [docs/a2_rule_audit.md](docs/a2_rule_audit.md), [docs/audit_followup_tests.md](docs/audit_followup_tests.md).**
 > Latest findings (2026-05-07, post walk-forward): A2 + rule-based exits is the deployable system (walk-forward 6/6 folds positive, mean Sharpe **+9.00** at fee=0). DQN exit-timing variants (B/C/B5/C2) explored extensively; B5 fixed-window does learn real exit policies but **does not beat rule-based exits in walk-forward** (1/6 folds). Production path is Path X (maker-only execution) → live with A2 + rule-based.
 
 ## What this project is

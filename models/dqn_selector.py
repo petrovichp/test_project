@@ -153,7 +153,8 @@ def evaluate_policy(net: DQN, state, valid, signals, prices,
     n_bars   = len(state)
     equity   = 1.0; peak = 1.0; last_pnl = 0.0
     eq_arr   = np.full(n_bars, 1.0, dtype=np.float64)
-    trade_pnls = []; n_actions = np.zeros(valid.shape[1], dtype=np.int64)
+    trade_pnls = []; trade_dirs = []; trade_strats = []
+    n_actions = np.zeros(valid.shape[1], dtype=np.int64)
     n_trades = 0
     n_steps  = 0
 
@@ -193,9 +194,13 @@ def evaluate_policy(net: DQN, state, valid, signals, prices,
                 eq_arr[t:t_close + 1] = equity
                 equity   *= (1.0 + float(pnl))
                 eq_arr[t_close + 1:] = equity                       # extend tail
+                if t_close == n_bars - 1:
+                    eq_arr[-1] = equity                             # ensure last bar reflects post-exit
                 peak      = max(peak, equity)
                 last_pnl  = float(pnl)
                 trade_pnls.append(float(pnl))
+                trade_dirs.append(int(direction))
+                trade_strats.append(int(k))
                 n_trades += 1
                 t_next = t_close + 1
         t = t_next
@@ -217,6 +222,8 @@ def evaluate_policy(net: DQN, state, valid, signals, prices,
         win_rate     = float(win_rate),
         total_return = float(total_ret),
         trade_pnls   = trade_pnls,
+        trade_dirs   = trade_dirs,
+        trade_strats = trade_strats,
         action_counts= n_actions,
     )
 

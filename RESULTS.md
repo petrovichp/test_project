@@ -1,7 +1,9 @@
 # Crypto Trading ML — Results & Conclusions
 
-> **Status (2026-05-07, post walk-forward):**
-> - **A2 + rule-based exits is the deployable system: 6/6 RL-fold walk-forward positive, mean Sharpe +9.00, median +8.74, fold-equity gains 1.07× to 2.23× per ~32-day fold.**
+> **Status (2026-05-07, post walk-forward + audit follow-up tests):**
+> - **A2 + rule-based exits is the deployable system: 6/6 RL-fold walk-forward positive, mean Sharpe +9.034, median +8.87, fold-equity gains 1.07× to 2.23× per ~32-day fold.**
+> - **5 audit-surfaced perturbations all DEGRADE the baseline** (ablate S6/S10/S7: −0.47/−1.44/−1.39 Sharpe; tighten TP×0.85/0.70: −0.96/−0.60). The baseline is at a local optimum for the search space we explored. Per-strategy attribution from the audit was descriptive, not prescriptive — A2 has learned strategy interactions that aren't visible at per-strategy granularity. See [docs/audit_followup_tests.md](docs/audit_followup_tests.md).
+> - **A2 is defensive (anti-correlated with BTC, corr −0.63)** — biggest Sharpe in the worst BTC folds (folds 1, 2, 4 with BTC −6%, −17%, −30%). Short trades carry more aggregate alpha than long trades despite 65% long trade COUNT. The audit's "long-bias warning" was a false alarm.
 > - C2_fix240 (A2 + B5_fix240 RL exits) **does not beat rule-based** in walk-forward (1/6 folds where B5 > rule, mean Δ **−6.41 Sharpe**). The +8.33 single-shot test result was real but came from fold 6, which happened to be a stressed regime where rule-based was uncharacteristically weak (+2.46) — not a sign of a structural improvement.
 > - B5_fix240 has value as a **defensive variant**: in fold 6 it cuts max DD (−4.14% vs −9.69%) and wins outright. But across folds 1-5 the rule-based TP/SL/trail captures alpha that B5's binary HOLD/EXIT_NOW cannot.
 > - A2 fee-free entry signal is **strongly generalized**: never negative across 6 folds. Mean +9.00 Sharpe in walk-forward.
@@ -442,6 +444,9 @@ On strategies that produce TP-friendly trade trajectories (most of them, in fold
 9. **Per-strategy exit DQN ≫ pooled exit DQN** (B4 mean +0.6 vs B2 −4.23 at maker fee; B5 follows same pattern).
 10. **Window length matters**: N=240 dominates N=60 and N=120 in B5 per-strategy and in C2 composition. Strategies need long horizons to fully express edge.
 11. **A2 + rule-based exits is robust across all 6 RL folds** (mean Sharpe +9.00, 6/6 positive, equity 1.07× to 2.23× per ~32-day fold). This is the deployable system. Rule-based exits' TP-capture and trail-after-breakeven capture alpha that binary RL exits cannot replicate.
+12. **A2 is anti-correlated with BTC (corr −0.63)** — biggest Sharpe in negative-BTC folds. Short alpha (+133.7% aggregate) exceeds long alpha (+117.3% aggregate). The 65% long-trade count is misleading; per-trade short alpha is larger than per-trade long alpha.
+13. **Per-strategy attribution is not prescriptive**. Strategies that look negative in isolation (S6, S7 on test, S10 on test) cannot be safely ablated — A2 has learned compositional dependencies among them. Removing any single strategy degrades aggregate Sharpe by 0.5-1.5.
+14. **TP thresholds are non-monotonically tuned** through ATR-scaling. Mild tightening (×0.85) hurts more than aggressive tightening (×0.70). The current `EXECUTION_CONFIG` is at a near-optimum.
 
 ### What's still unknown
 1. **Walk-forward stability of A2/A4** across the 6 RL folds.
