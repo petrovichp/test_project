@@ -56,11 +56,16 @@ def _load_entry_policy(ticker: str, tag: str = "A4") -> DQN:
     return net
 
 
-def _load_exit_policies(ticker: str) -> list:
-    """Load 9 per-strategy exit DQNs (B4_S0..S8). Index aligns with STRAT_KEYS."""
+def _load_exit_policies(ticker: str, prefix: str = "B4_S") -> list:
+    """Load 9 per-strategy exit DQNs (e.g. B4_S0..S8 or B4_fee0_S0..S8).
+    Index aligns with STRAT_KEYS."""
     nets = []
     for k in range(len(STRAT_KEYS)):
-        path = CACHE / f"{ticker}_exit_dqn_policy_B4_S{k}.pt"
+        path = CACHE / f"{ticker}_exit_dqn_policy_{prefix}{k}.pt"
+        if not path.exists():
+            print(f"  ! missing exit policy {path.name} — using rule-only fallback for k={k}")
+            nets.append(None)
+            continue
         net  = ExitDQN(EXIT_STATE_DIM, N_ACTIONS, hidden=64)
         net.load_state_dict(torch.load(path, map_location="cpu"))
         net.eval()
@@ -93,10 +98,11 @@ def evaluate_combined(
     per_strat_pnls = [[] for _ in range(9)]
     rl_exits = tp_exits = sl_exits = time_exits = eod_exits = invalid = 0
 
-    # build greedy exit policies once (one per strategy)
-    if use_rl_exits:
-        exit_policies = [_GreedyExit(net) for net in exit_nets]
+    # build greedy exit policies once (one per strategy); None entries fall back to HOLD
     hold_policy = _AlwaysHold()
+    if use_rl_exits:
+        exit_policies = [_GreedyExit(net) if net is not None else hold_policy
+                          for net in exit_nets]
 
     t = 0
     while t < n_bars - 2:
@@ -214,15 +220,17 @@ def _print_summary(label: str, r: dict, baseline: dict = None):
                   f"win {ps['win_rate']*100:>5.1f}%")
 
 
-def run(ticker: str = "btc", fee: float = 0.0004, entry_tag: str = "A4"):
+def run(ticker: str = "btc", fee: float = 0.0004, entry_tag: str = "A4",
+         exit_prefix: str = "B4_S", out_tag: str = "C1"):
     t0 = time.perf_counter()
-    print(f"\n{'='*78}\n  GROUP C1 — A{entry_tag[1:]} ENTRY + B4 EXITS  ({ticker.upper()})  fee={fee:.4f}\n{'='*78}")
+    print(f"\n{'='*78}\n  GROUP {out_tag} — {entry_tag} ENTRY + {exit_prefix.rstrip('_S').rstrip('_')} EXITS  "
+          f"({ticker.upper()})  fee={fee:.4f}\n{'='*78}")
 
     # ── load policies ────────────────────────────────────────────────────────
     print(f"  loading entry policy {entry_tag} ...")
     entry_net = _load_entry_policy(ticker, entry_tag)
-    print(f"  loading 9 exit policies B4_S0..S8 ...")
-    exit_nets = _load_exit_policies(ticker)
+    print(f"  loading 9 exit policies {exit_prefix}0..8 ...")
+    exit_nets = _load_exit_policies(ticker, prefix=exit_prefix)
 
     vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
     atr_med = float(vol["atr_train_median"])
@@ -250,14 +258,14 @@ def run(ticker: str = "btc", fee: float = 0.0004, entry_tag: str = "A4"):
             fee=fee, use_rl_exits=True)
         print(f"  combined  ({split}) eval in {time.perf_counter()-t1:.1f}s")
 
-        _print_summary(f"{split.upper()}  rule-only (A{entry_tag[1:]} entry + rule exits)", base)
-        _print_summary(f"{split.upper()}  combined  (A{entry_tag[1:]} entry + B4 per-strategy RL exits)",
+        _print_summary(f"{split.upper()}  rule-only ({entry_tag} entry + rule exits)", base)
+        _print_summary(f"{split.upper()}  combined  ({entry_tag} entry + {exit_prefix.rstrip('_S').rstrip('_')} RL exits)",
                         combo, baseline=base)
 
         results[split] = dict(rule_only=_pack(base), combined=_pack(combo))
 
     # ── final summary ───────────────────────────────────────────────────────
-    print(f"\n\n{'='*78}\n  GROUP C1 — RESULT TABLE\n{'='*78}")
+    print(f"\n\n{'='*78}\n  GROUP {out_tag} — RESULT TABLE\n{'='*78}")
     print(f"\n  {'split':<6}  {'baseline (A4+rule)':>20}  {'combined (A4+B4)':>18}  {'ΔSharpe':>10}  "
           f"{'Δeq':>9}")
     print("  " + "─" * 75)
@@ -270,8 +278,9 @@ def run(ticker: str = "btc", fee: float = 0.0004, entry_tag: str = "A4"):
               f"{d_sharpe:>+10.3f}  {d_eq*100:>+8.2f}%")
 
     # ── save artefacts ──────────────────────────────────────────────────────
-    out = CACHE / f"{ticker}_groupC1_summary.json"
+    out = CACHE / f"{ticker}_group{out_tag}_summary.json"
     payload = dict(ticker=ticker, fee=fee, entry_tag=entry_tag,
+                    exit_prefix=exit_prefix,
                     results={s: dict(rule_only=_pack(results[s]["rule_only"], drop_eq=True),
                                        combined=_pack(results[s]["combined"], drop_eq=True))
                               for s in ("val", "test")})
@@ -295,5 +304,10 @@ if __name__ == "__main__":
     ap.add_argument("ticker", nargs="?", default="btc")
     ap.add_argument("--fee", type=float, default=0.0004)
     ap.add_argument("--entry-tag", default="A4", dest="entry_tag")
+    ap.add_argument("--exit-prefix", default="B4_S", dest="exit_prefix",
+                     help="prefix for exit-policy filenames (e.g. 'B4_S' or 'B4_fee0_S')")
+    ap.add_argument("--out-tag", default="C1", dest="out_tag",
+                     help="tag for output JSON, e.g. 'C1' or 'C1_fee0'")
     args = ap.parse_args()
-    run(args.ticker, fee=args.fee, entry_tag=args.entry_tag)
+    run(args.ticker, fee=args.fee, entry_tag=args.entry_tag,
+         exit_prefix=args.exit_prefix, out_tag=args.out_tag)

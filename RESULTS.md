@@ -1,6 +1,12 @@
 # Crypto Trading ML — Results & Conclusions
 
-> **Status (2026-05-07):** RL entry-gating works on val at maker fees (Group A4: val Sharpe **+1.72**, but **test −1.65** — needs walk-forward validation). RL exit-timing tested in Groups B + C1: per-strategy exit DQNs improve 6/9 strategies in isolation (mean Δ +0.6, best +1.97 Sharpe), but **do not transfer when stacked on A4 entries** (C1: Δ −0.07 val, −0.89 test). Group C2 (joint hierarchical training) dropped. Forward path: lock A4 (walk-forward + seed variance) before Path X.
+> **Status (2026-05-07):**
+> - **Signal generalizes fee-free** (A2: **val +7.30, test +3.78**, equity 1.13× on locked test). The trading edge is real.
+> - **At maker fee** A4 has a val/test gap (val +1.72, test −1.65) — needs walk-forward + seed-variance validation.
+> - **RL exit-timing is real** (B4_fee0: 7/9 strategies positive, mean Δ +1.84, best +4.20 on S4_MACDTrend — clears the gate Group B failed at maker fee).
+> - **But composition fails**: stacking trained exit DQNs onto trained entry DQN doesn't transfer (C1 maker: Δ −0.07/−0.89; C1_fee0: Δ +0.05/−2.70). Training-distribution mismatch is structural — exit DQN trained on ~30% bar coverage doesn't transfer to ~3% selective entries.
+> - **Group C2 (joint hierarchical training)** is the architecturally correct fix but stays deferred (~3–5 days, lower expected value than production-readiness work).
+> - **Forward path:** lock A4 (walk-forward + seed variance) → Path X (maker execution) → live with A2/A4 entries + rule-based exits.
 
 ---
 
@@ -25,9 +31,11 @@
 
 ## TL;DR
 
-The strategies have real predictive edge. Fees are what kills them on 1-minute BTC. The DQN that originally failed at taker fee (val Sharpe **−5.87**) becomes a working policy at maker fee (val Sharpe **+1.72**, equity 0.98× over val+test) and an excellent one fee-free (Sharpe **+7.30**, equity 1.60× over val+test, beats BTC buy-and-hold by 1.4×).
+The strategies have real predictive edge. Fees are what kills them on 1-minute BTC. The DQN that originally failed at taker fee (val Sharpe **−5.87**) becomes a working policy at maker fee (val Sharpe **+1.72**, **but test −1.65** — needs walk-forward) and a strong one fee-free (**val Sharpe +7.30, test +3.78, equity 1.13× on the locked test split** — generalizes).
 
-**Production path:** maker-only execution on OKX (Path X) → reduces effective fee from 0.16% to ~0.04% round-trip → unlocks deployable RL entry-gating.
+**RL exit-timing is also real fee-free** (B4_fee0: best +4.20 Sharpe on S4_MACDTrend, mean +1.84 across strategies — clears the +4 gate Group B failed at maker fee). But trained exit DQNs **do not transfer** when stacked on a separately-trained entry DQN (C1 maker Δ −0.07/−0.89; C1_fee0 Δ +0.05/−2.70). Joint hierarchical training (C2) is the architecturally correct fix but is deferred.
+
+**Production path:** maker-only execution on OKX (Path X) → reduces effective fee from 0.16% to ~0.04% round-trip → shifts conditions toward fee-free regime where A2 alone gives val +7.30 / test +3.78.
 
 **Reference plot:** [cache/btc_dqn_groupA_equity_vs_price.png](cache/btc_dqn_groupA_equity_vs_price.png)
 
@@ -47,14 +55,15 @@ The follow-up Group A sweep retrained the DQN at three fee levels × three penal
 
 ## Best Results Table
 
-| Cell | Method | Fee | Penalty | Val Sharpe | Test result | Status |
+| Cell | Method | Fee | Penalty | Val Sharpe | Test Sharpe (locked) | Status |
 |---|---|---|---|---|---|---|
-| **A2** | DQN entry-gate | 0 (fee-free) | 0.001 (0.1%) | **+7.30** | 1.60× equity (val+test 10wk) | best overall ✓ |
-| **A4** | DQN entry-gate | 0.0004 (maker) | 0 | **+1.72** (val) | val eq 1.072, **test Sharpe −1.65 (eq 0.94)** | needs walk-forward validation |
+| **A2** | DQN entry-gate | 0 (fee-free) | 0.001 (0.1%) | **+7.30** (eq 1.40) | **+3.78** (eq 1.13) | **best overall, generalizes ✓** |
+| **A4** | DQN entry-gate | 0.0004 (maker) | 0 | **+1.72** (eq 1.07) | **−1.65** (eq 0.94) | val/test gap, needs walk-forward |
+| B4_fee0_S3 | Per-strategy exit DQN (S4_MACDTrend) | 0 | — | **+4.74** (Δ +4.20 over baseline) | — | clears the +4 exit gate |
+| C1_fee0 | A2 entry + B4_fee0 exits stacked | 0 | — | +3.93 (Δ +0.05) | +4.28 (Δ −2.70) | composition fails ✗ |
 | A1 | DQN entry-gate | 0 | 0 | +5.81 | — | confirms RL works fee-free |
 | Phase 1a passive | Free-firing strategies | 0 | — | +2.31 grand mean across folds | — | RL adds +5 lift over passive |
-| A0 | DQN entry-gate | 0.0008 (taker) | 0 | −5.87 | 0.67× equity (val+test 10wk) | replicates prior failure ✗ |
-| CUSUM gate (prior v3) | Rule-based regime gate | 0.0008 | — | +2.09 (prior eval) | +3.13 (single-window artifact, didn't replicate) | superseded |
+| A0 | DQN entry-gate | 0.0008 (taker) | 0 | −5.87 (eq 0.76) | — | replicates prior failure ✗ |
 
 ---
 
@@ -263,22 +272,65 @@ To make joint entry+exit RL work, you'd need to retrain the exit DQN on A4's ent
 
 ---
 
+### Group B4_fee0 + C1_fee0 — fee-free re-test (KEY FINDING: signal generalizes, composition still fails)
+
+To test whether the fee drag was the killer, the per-strategy exit DQNs were retrained at fee=0 (B4_fee0) and stacked on the strongest entry policy A2 (C1_fee0). Modules: [models/exit_dqn.py](models/exit_dqn.py), [models/group_c_eval.py](models/group_c_eval.py).
+
+**B4_fee0 (per-strategy exit DQN at fee=0):**
+
+| Cell | Strategy | Baseline | RL exit | Δ |
+|---|---|---|---|---|
+| B4_fee0_S0 | S1_VolDir    | −0.55 | **+3.39** | **+3.94** |
+| B4_fee0_S1 | S2_Funding   | +2.17 | **+5.72** | **+3.56** |
+| **B4_fee0_S3** | **S4_MACDTrend** | **+0.54** | **+4.74** | **+4.20 ★ clears +4 gate** |
+| B4_fee0_S4 | S6_TwoSignal | −2.43 | +0.06 | +2.49 |
+| B4_fee0_S5 | S7_OIDiverg  | +6.09 | +5.51 | −0.58 |
+| B4_fee0_S6 | S8_TakerFlow | +1.96 | +2.94 | +0.98 |
+| B4_fee0_S7 | S10_Squeeze  | +2.17 | +3.01 | +0.85 |
+
+**7/9 positive, mean Δ +1.84, best +4.20.** RL exit-timing IS a real signal — it just gets eaten by the 0.08% round-trip maker fee at 1-min cadence. Confirmation of the fee-drag hypothesis.
+
+**A2 standalone test re-eval (uncapped simulator, apples-to-apples with Group A):**
+
+| Split | Sharpe | Trades | Win % | Equity | Max DD |
+|---|---|---|---|---|---|
+| val  | **+7.295** | 251 | 55.0% | 1.398 | −6.31% |
+| test | **+3.776** | 185 | 55.1% | 1.127 | −9.69% |
+
+A2's val/test gap is **modest and expected** (+7.30 → +3.78, equity 1.40× → 1.13×) — the signal generalizes. This is materially different from A4's val/test gap (+1.72 → −1.65, sign flip).
+
+**C1_fee0 (A2 entry + B4_fee0 exits, stacked, internal Δ same simulator):**
+
+| Split | A2 + rule | A2 + B4_fee0 RL | ΔSharpe | Δ equity |
+|---|---|---|---|---|
+| val  | +3.876 | +3.928 | **+0.05** | −0.94% |
+| test | +6.979 | +4.280 | **−2.70** | −10.06% |
+
+**Composition fails even at fee=0.** B4_fee0 trained on noisy "all-firing" entries learned to bail early; A2's selective ~3% entries reward longer holding, so RL exits truncate winners. The transfer pathology is **structural, not fee-related**.
+
+→ Detailed log: [docs/experiments_log.md#group-b4_fee0](docs/experiments_log.md#group-b4_fee0--per-strategy-exit-dqn-at-fee0) and [§ C1_fee0](docs/experiments_log.md#group-c1_fee0--a2-entry--b4_fee0-exits-at-fee0)
+
+---
+
 ## Cumulative Insights
 
 ### What's confirmed
 1. **Strategies have predictive edge** (Path 1a fee-free, 1b oracle).
 2. **Fees consume the edge under taker pricing** (Path 1a Δ=+12.4 Sharpe from removing fees; Group A red-vs-orange-vs-green spread).
-3. **State representation is sufficient for entry gating at low fees** (Group A2 +7.30, A4 +1.72).
+3. **State representation is sufficient for entry gating at low fees** (A2 val +7.30, **test +3.78** — generalizes; A4 val +1.72 but test −1.65).
 4. **State representation is insufficient for residual signal extraction beyond what strategies use** (D1 Spearman 0.084).
 5. **Time-scale isn't the issue** (Path 1c — 5-min has same fee-free Sharpe as 1-min).
-6. **Exits leave ~14 Sharpe on the table** (Path 1b oracle gap).
+6. **RL exit-timing is real fee-free** (B4_fee0 mean Δ +1.84, best +4.20 clears the +4 gate).
+7. **Trained entry+exit DQNs do not compose without joint training** (C1 maker Δ −0.07/−0.89; C1_fee0 Δ +0.05/−2.70). Training-distribution mismatch is structural.
+8. **Per-strategy exit DQN ≫ pooled exit DQN** (B4 mean +0.6 vs B2 −4.23 at maker fee; same pattern fee-free).
 
 ### What's still unknown
-1. **Walk-forward stability of A4** at maker fee. Group A val/test result is one window.
-2. **Seed sensitivity** of A4 — how robust is the +1.72?
+1. **Walk-forward stability of A2/A4** across the 6 RL folds.
+2. **Seed sensitivity** — how robust are the +7.30 val / +3.78 test (A2) and +1.72 val / −1.65 test (A4) numbers?
 3. **Real-world fill rates** for maker orders (production scoping).
-4. ~~Whether RL can replace TP/SL with better-than-fixed exits~~ **Partially resolved (Group B): yes for 6/9 strategies in B4, but lift is small (mean +0.6 Sharpe, best +1.97), well below the +4 gate. Stand-alone strategies stay unprofitable at maker fee.**
-5. ~~Whether stacked entry+exit RL composes cleanly~~ **C2 (joint hierarchical training) dropped. C1 (sequential composition: A4 entry + B4 exits) ran — see Group C section.**
+4. **Whether C2 (joint hierarchical training) closes the composition gap.** Deferred — C1/C1_fee0 evidence + production-readiness priority make C2 lower expected value than walk-forward + Path X.
+5. ~~Whether RL can replace TP/SL with better-than-fixed exits~~ **Resolved partially: per-strategy exit DQN clears the +4 gate at fee=0 (B4_fee0_S3 +4.20) but is small at maker fee. Stand-alone exit improvement IS real fee-free.**
+6. ~~Whether stacked entry+exit RL composes cleanly~~ **Resolved: NO under sequential composition (C1, C1_fee0 both fail). Joint training (C2) untested.**
 
 ---
 

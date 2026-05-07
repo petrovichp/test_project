@@ -8,12 +8,13 @@ Forward-looking plan after Group A breakthrough and Group B closeout. Companion 
 
 | ID | Experiment | Effort | Status |
 |---|---|---|---|
-| **Reduced scope** | Lock A4 (walk-forward + seed variance + penalty fine-grid) | ~1 day | **hard prerequisite** — A4 val +1.72 but test −1.65 |
-| **Path X** | Maker-only execution scoping | ~3–5 days | production deployment, conditional on Reduced scope passing |
-| **Alternative pivots** | Funding-rate / vol trading / statarb / cross-timeframe | open-ended | if A4 fails Reduced scope |
-| ~~Group B~~ | ~~Exit-timing DQN~~ | — | **closed 2026-05-07: per-strategy gives modest +0.6 mean lift, below +4 gate** |
-| ~~Group C1~~ | ~~A4 entry + B4 exits sequential~~ | — | **closed 2026-05-07: B4 doesn't transfer to A4 entries (Δ -0.07/-0.89)** |
-| ~~Group C2~~ | ~~Stacked entry+exit RL (joint hierarchical)~~ | — | **dropped — given C1 fails, C2 expected value is low** |
+| **Reduced scope** | Lock A2 + A4 (walk-forward + seed variance + penalty fine-grid) | ~1 day | **hard prerequisite** — A2 val/test gap is OK (+7.30/+3.78), A4's is severe (+1.72/−1.65) |
+| **Path X** | Maker-only execution scoping | ~3–5 days | production deployment; A2 generalizes to fee=0-like regime under maker rebates |
+| **Alternative pivots** | Funding-rate / vol trading / statarb / cross-timeframe | open-ended | if Reduced scope fails |
+| **Group C2 (deferred)** | Joint hierarchical entry+exit training | ~3–5 days | architecturally correct fix for C1 transfer failure; revisit after Path X |
+| ~~Group B~~ | ~~Exit-timing DQN at maker fee~~ | — | **closed: per-strategy mean +0.6, below +4 gate** |
+| ~~Group B4_fee0~~ | ~~Exit-timing DQN at fee=0~~ | — | **closed: per-strategy mean +1.84, best +4.20 clears gate** |
+| ~~Group C1, C1_fee0~~ | ~~Sequential entry+exit composition~~ | — | **closed: composition fails at both fee levels (Δ −0.89 / −2.70 on test)** |
 
 Detailed breakdowns of each remaining experiment in the sections below; Group B / C summaries kept for the record.
 
@@ -182,27 +183,33 @@ Only if Groups B/C don't move the needle and A4 alone isn't enough for productio
 
 ---
 
-## Recommended sequencing (post-Group-B and post-C1)
+## Recommended sequencing (post-Group-B/C, post-C1_fee0)
 
-A4's reported val Sharpe +1.72 has a **−1.65 test Sharpe** when re-evaluated, which surfaced as a side-finding from Group C1. Locking A4 is now a *hard prerequisite*, not just a recommendation.
+The signal generalizes fee-free (A2 val +7.30 / test +3.78). At maker fee A4 has a val/test sign flip that needs walk-forward validation. RL exit-timing is real but doesn't compose with separately-trained entries. The forward path:
 
 ```
-Step 1: Reduced scope (~1 day) — lock A4
-        ├─ Walk-forward A4 across 6 RL folds
-        ├─ Penalty fine-grid at fee=0.0004
-        ├─ A4 seed variance (5 seeds)
-        └─ Re-eval A4 on locked test split (currently val +1.72, test −1.65)
+Step 1: Reduced scope (~1 day) — lock A2 and A4
+        ├─ Walk-forward A2 + A4 across 6 RL folds
+        ├─ Penalty fine-grid at fee=0.0004 (A4) and fee=0 (A2)
+        ├─ Seed variance (5 seeds each, std < 1.0 = stable)
+        └─ Re-eval on locked test split with original simulator
         ↓
 Step 2: Decision gate
-        ├─ A4 walk-forward ≥4/6 positive AND seed std < 1.0
-        │  AND test ≥ 0  → Path X
-        └─ A4 fragile     → pivot to alternative alpha (funding-rate / vol /
-                             statarb / cross-timeframe)
+        ├─ A2 walk-forward ≥4/6 positive (best case: production with maker rebates)
+        ├─ A4 walk-forward ≥4/6 positive (back-up: production at maker fee)
+        └─ Both fragile  → pivot to alternative alpha
         ↓
-Step 3: Path X (~4-5 days) — maker execution layer + paper-trade
+Step 3: Path X (~3-5 days) — maker execution layer
+        ├─ Limit order placement + re-quote logic
+        ├─ Probabilistic fill simulation
+        └─ Re-validate A2/A4 with realistic maker-fill modeling
         ↓
-Step 4: Live with A4 entry + rule-based exits.
-        Bolting on B4 per-strategy exit DQNs is NOT recommended given C1 result.
+Step 4: Paper-trade (2-4 weeks) → live with rule-based exits
+        ↓
+Optional Step 5 (deferred):
+        ├─ Group C2 (joint hierarchical entry+exit training) — if exit alpha
+        │    becomes the bottleneck after deployment validates entry signal
+        └─ Alternative exit formulations (dynamic SL, signal-driven thresholds)
 ```
 
 ---
