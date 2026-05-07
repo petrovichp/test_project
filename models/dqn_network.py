@@ -35,6 +35,22 @@ class DQN(nn.Module):
         return sum(p.numel() for p in self.parameters())
 
 
+class EnsembleDQN(nn.Module):
+    """Wraps K DQNs; forward returns averaged Q-values across all members.
+
+    Same call signature as DQN — drop-in for masked_argmax / evaluate_policy.
+    """
+    def __init__(self, nets: list):
+        super().__init__()
+        self.nets = nn.ModuleList(nets)
+        self.state_dim = nets[0].state_dim
+        self.n_actions = nets[0].n_actions
+
+    def forward(self, s: torch.Tensor) -> torch.Tensor:
+        qs = torch.stack([net(s) for net in self.nets], dim=0)   # (K, B, n_actions)
+        return qs.mean(dim=0)
+
+
 def masked_argmax(net: DQN, state: torch.Tensor,
                    valid_actions_mask: torch.Tensor) -> torch.Tensor:
     """Inference path. valid_actions_mask: (B, n_actions) bool."""

@@ -1,6 +1,6 @@
 # Crypto Trading ML — Project Context
 
-> **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/baselines.md](docs/baselines.md), [docs/seed_variance.md](docs/seed_variance.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md), [docs/data_splits.md](docs/data_splits.md), [docs/a2_rule_audit.md](docs/a2_rule_audit.md), [docs/audit_followup_tests.md](docs/audit_followup_tests.md).**
+> **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/baselines.md](docs/baselines.md), [docs/seed_variance.md](docs/seed_variance.md), [docs/ensemble_baseline.md](docs/ensemble_baseline.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md), [docs/data_splits.md](docs/data_splits.md), [docs/a2_rule_audit.md](docs/a2_rule_audit.md), [docs/audit_followup_tests.md](docs/audit_followup_tests.md).**
 > Latest findings (2026-05-07, post walk-forward): two frozen reference baselines (see [docs/baselines.md](docs/baselines.md)) — **BASELINE_FULL** (all 9 strategies, walk-forward mean Sharpe +9.034, primary deployable) and **BASELINE_LEAN** (5 strategies, S6/S7/S10 ablated, mean Sharpe +6.756 but wins DQN-test single-shot and WF folds 3/6). All future experiments compare deltas vs both. DQN exit-timing variants (B/C/B5/C2) explored extensively; B5 fixed-window does not beat rule-based exits in walk-forward (1/6 folds). Production path is Path X (maker-only execution) → live with rule-based exits.
 
 ## What this project is
