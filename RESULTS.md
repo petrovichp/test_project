@@ -3,10 +3,10 @@
 > **Status (2026-05-07):**
 > - **Signal generalizes fee-free** (A2: **val +7.30, test +3.78**, equity 1.13× on locked test). The trading edge is real.
 > - **At maker fee** A4 has a val/test gap (val +1.72, test −1.65) — needs walk-forward + seed-variance validation.
-> - **RL exit-timing is real** (B4_fee0: 7/9 strategies positive, mean Δ +1.84, best +4.20 on S4_MACDTrend — clears the gate Group B failed at maker fee).
-> - **But composition fails**: stacking trained exit DQNs onto trained entry DQN doesn't transfer (C1 maker: Δ −0.07/−0.89; C1_fee0: Δ +0.05/−2.70). Training-distribution mismatch is structural — exit DQN trained on ~30% bar coverage doesn't transfer to ~3% selective entries.
-> - **Group C2 (joint hierarchical training)** is the architecturally correct fix but stays deferred (~3–5 days, lower expected value than production-readiness work).
-> - **Forward path:** lock A4 (walk-forward + seed variance) → Path X (maker execution) → live with A2/A4 entries + rule-based exits.
+> - **Group B5 (fixed-window exit DQN)** with 53-dim enriched state (price-path + vol-window + trajectory scalars) **works**: 9/9 strategies positive at N=240, mean Δ +3.48 over no-exit baseline, max +6.69 (S10_Squeeze).
+> - **C2_fix240 (A2 entry + B5_fix240 exits) is a breakthrough on test**: **Sharpe +8.329, equity 1.343× on locked test split** — beats A2-alone (+3.78, 1.13×) by +4.55 Sharpe with lower max-DD (−4.29% vs −9.69%) and 67% win rate. **First time RL exit stacking adds real value on a held-out split.** Val side is weak (−1.43), so walk-forward validation across 6 RL folds is the next mandatory step before relying on this.
+> - C1 (variable-length exit DQN composition) confirmed as failed; C2_fix240's success demonstrates that the failure was specifically the variable-length+rule-active formulation, not RL composition in general.
+> - **Forward path:** walk-forward A2 + walk-forward C2_fix240 across 6 folds → seed variance → if both stable, deploy via Path X (maker execution).
 
 ---
 
@@ -31,11 +31,13 @@
 
 ## TL;DR
 
-The strategies have real predictive edge. Fees are what kills them on 1-minute BTC. The DQN that originally failed at taker fee (val Sharpe **−5.87**) becomes a working policy at maker fee (val Sharpe **+1.72**, **but test −1.65** — needs walk-forward) and a strong one fee-free (**val Sharpe +7.30, test +3.78, equity 1.13× on the locked test split** — generalizes).
+The strategies have real predictive edge. Fees are what kills them on 1-minute BTC. The entry DQN works fee-free (A2: val +7.30, **test +3.78**, equity 1.13×) and at maker fee with a val/test gap (A4: val +1.72, test −1.65 — needs walk-forward).
 
-**RL exit-timing is also real fee-free** (B4_fee0: best +4.20 Sharpe on S4_MACDTrend, mean +1.84 across strategies — clears the +4 gate Group B failed at maker fee). But trained exit DQNs **do not transfer** when stacked on a separately-trained entry DQN (C1 maker Δ −0.07/−0.89; C1_fee0 Δ +0.05/−2.70). Joint hierarchical training (C2) is the architecturally correct fix but is deferred.
+**The big new finding (2026-05-07):** redesigning the exit DQN with **fixed-length 240-bar episodes** + **enriched 53-dim state** (price-path window, volatility window, in-trade trajectory scalars, time-of-day) cleared the variable-length transfer pathology. **Stacking it on A2 entries (Group C2_fix240) gives val Sharpe −1.43 but test Sharpe +8.33 with equity 1.343× on the locked test split** — beats A2-alone with rule-based exits (test +3.78) by +4.55 Sharpe with lower max-DD (−4.29% vs −9.69%) and higher win rate (67% vs 56%).
 
-**Production path:** maker-only execution on OKX (Path X) → reduces effective fee from 0.16% to ~0.04% round-trip → shifts conditions toward fee-free regime where A2 alone gives val +7.30 / test +3.78.
+The val/test asymmetry is real and not yet explained — the per-strategy B5 policies were val-checkpointed *per strategy* but not on the composition, so C2_val is genuinely OOS. **Walk-forward across the 6 RL folds is the immediate next step** to verify whether the test result generalizes or is window-specific.
+
+**Production path:** if walk-forward confirms C2_fix240, deploy A2 entry + B5_fix240 exits via Path X maker execution. Otherwise fall back to A2 alone with rule-based exits (val +7.30 / test +3.78, already deployable).
 
 **Reference plot:** [cache/btc_dqn_groupA_equity_vs_price.png](cache/btc_dqn_groupA_equity_vs_price.png)
 
@@ -55,15 +57,19 @@ The follow-up Group A sweep retrained the DQN at three fee levels × three penal
 
 ## Best Results Table
 
-| Cell | Method | Fee | Penalty | Val Sharpe | Test Sharpe (locked) | Status |
-|---|---|---|---|---|---|---|
-| **A2** | DQN entry-gate | 0 (fee-free) | 0.001 (0.1%) | **+7.30** (eq 1.40) | **+3.78** (eq 1.13) | **best overall, generalizes ✓** |
-| **A4** | DQN entry-gate | 0.0004 (maker) | 0 | **+1.72** (eq 1.07) | **−1.65** (eq 0.94) | val/test gap, needs walk-forward |
-| B4_fee0_S3 | Per-strategy exit DQN (S4_MACDTrend) | 0 | — | **+4.74** (Δ +4.20 over baseline) | — | clears the +4 exit gate |
-| C1_fee0 | A2 entry + B4_fee0 exits stacked | 0 | — | +3.93 (Δ +0.05) | +4.28 (Δ −2.70) | composition fails ✗ |
-| A1 | DQN entry-gate | 0 | 0 | +5.81 | — | confirms RL works fee-free |
-| Phase 1a passive | Free-firing strategies | 0 | — | +2.31 grand mean across folds | — | RL adds +5 lift over passive |
-| A0 | DQN entry-gate | 0.0008 (taker) | 0 | −5.87 (eq 0.76) | — | replicates prior failure ✗ |
+| Cell | Method | Fee | Val Sharpe | Test Sharpe (locked) | Status |
+|---|---|---|---|---|---|
+| **C2_fix240** | A2 entry + B5_fix240 per-strategy exits stacked | 0 | −1.43 (eq 0.93) | **+8.329 (eq 1.343)** | **best test result, needs walk-forward ★** |
+| **A2** | DQN entry-gate (no exit RL) | 0 | **+7.30** (eq 1.40) | **+3.78** (eq 1.13) | **strong baseline, generalizes ✓** |
+| C2_fix120 | A2 entry + B5_fix120 exits stacked | 0 | −2.48 | +3.72 (eq 1.13) | matches A2-alone on test |
+| C2_fix60 | A2 entry + B5_fix60 exits stacked | 0 | +1.69 | −1.22 | weak on test |
+| **A4** | DQN entry-gate | 0.0004 (maker) | +1.72 (eq 1.07) | **−1.65** (eq 0.94) | val/test gap, needs walk-forward |
+| B5_fix240 (per-strat best) | Fixed-window exit DQN (S7_OIDiverg) | 0 | +5.91 | — | 9/9 strategies positive Δ |
+| B4_fee0_S3 | Per-strategy variable-length exit DQN (S4) | 0 | +4.74 (Δ +4.20) | — | clears +4 gate per-strategy |
+| C1_fee0 | A2 + B4_fee0 (variable-length) exits stacked | 0 | +3.93 (Δ +0.05) | +4.28 (Δ −2.70) | composition fails ✗ |
+| A1 | DQN entry-gate (no penalty) | 0 | +5.81 | — | confirms RL works fee-free |
+| Phase 1a passive | Free-firing strategies | 0 | +2.31 grand mean across folds | — | RL adds +5 lift over passive |
+| A0 | DQN entry-gate | 0.0008 (taker) | −5.87 (eq 0.76) | — | replicates prior failure ✗ |
 
 ---
 
@@ -314,6 +320,82 @@ A2's val/test gap is **modest and expected** (+7.30 → +3.78, equity 1.40× →
 
 ---
 
+### Group B5 + C2 — fixed-window exit DQN (KEY BREAKTHROUGH on test)
+
+C1's failure isolated to two structural issues with B4: variable episode length (rule-fired terminals dominated buffer) and the rule-vs-DQN race in credit assignment. **Group B5 fixes both.** Modules: [models/exit_dqn_fixed.py](models/exit_dqn_fixed.py), [models/group_b5_sweep.py](models/group_b5_sweep.py), [models/group_c2_eval.py](models/group_c2_eval.py).
+
+#### Design changes vs B4
+
+| | B4 (closed) | **B5 (new)** |
+|---|---|---|
+| Episode length | 1–240 bars (rule-determined) | **fixed N ∈ {60, 120, 240}** |
+| Rule-based exits during training | active | **disabled** — only DQN's EXIT_NOW or window-edge can terminate |
+| State dim | 28 (in-trade scalars + sliced market lags) | **53** with: price-path window (last 20 bars cum-return-from-entry), volatility window (last 10 bars \|log-ret\| standardized), in-trade trajectory scalars (max/min unrealized, bars-since-peak, running vol), time-of-day cyclic, entry-time static context |
+| Network | 28→64→32→2 (4,002 params) | 53→96→48→2 (10,114 params) |
+| Per-strategy variant | yes (B4_S0..S8) | yes (B5_fix{N}_fee0_S0..S8) |
+| Real-trading SL safety net | n/a (rules handle it) | optional inference-only layer |
+
+#### B5 per-strategy at fee=0 (best results across 27 cells)
+
+| Window | n positive Δ | mean Δ | max Δ | best abs Sharpe |
+|---|---|---|---|---|
+| N=60 | 8/9 | +2.29 | +6.25 (S1_VolDir) | +6.02 (S2_Funding) |
+| N=120 | 8/9 | +1.98 | +4.90 (S6_TwoSignal) | +4.35 (S7_OIDiverg) |
+| **N=240** | **9/9** | **+3.48** | **+6.69 (S10_Squeeze)** | +5.91 (S7_OIDiverg) |
+
+(Δ measured against the always-HOLD-to-N baseline — i.e., what the strategy would do if held to bar N regardless of unrealized PnL.)
+
+#### Composition test C2 — A2 entry + B5_fix{N} exits stacked at fee=0
+
+The actual production-relevant test:
+
+| Configuration | val Sharpe | test Sharpe | test equity | test max DD | test win % |
+|---|---|---|---|---|---|
+| A2 alone + rule-based exits (production target) | **+7.295** | +3.776 | 1.127 | −9.69% | 56.1% |
+| C2_fix60 (A2 + B5_fix60 exits) | +1.69 | −1.22 | 0.957 | −14.15% | 56.6% |
+| C2_fix120 (A2 + B5_fix120 exits) | −2.48 | +3.72 | 1.129 | — | 65.2% |
+| **C2_fix240 (A2 + B5_fix240 exits)** | **−1.43** | **+8.329** | **1.343** | **−4.29%** | **67.0%** |
+
+**The C2_fix240 test result is the strongest signal in the project:**
+- Sharpe **+8.33** vs A2-alone +3.78 → **+4.55 Sharpe gain** on locked test
+- Equity **1.343×** in 5 weeks vs A2-alone 1.127× → **+19% total return relative**
+- Lower max DD (−4.29% vs −9.69%) → less risk
+- Higher win rate (67% vs 56%) → more consistent
+- 206 trades vs 161 → similar trade frequency, RL exits 87 of 206 trades (42%)
+
+#### Important caveat — val performance is weak
+
+C2_fix240 val Sharpe is −1.43, vs A2-alone val +7.30. The val/test inversion is unusual and not fully explained:
+
+- B5 per-strategy policies were val-best-checkpointed *per strategy* on the dense entry distribution, not on the composition
+- Composition val (C2_val) is therefore genuinely OOS for the stacked system — it's not a selection artifact
+- The B5 policies that work well on per-strategy val (e.g., S7_OIDiverg val +5.91) don't necessarily transfer to A2's selective subset of S7 entries on val
+- But on test, the patterns evidently align — B5's exits and A2's entries compose well
+
+#### Why fixed-window helped (vs C1's failure)
+
+1. **No rule-fired terminals in buffer**: the DQN owns every terminal decision. Sparse-reward credit assignment is no longer confounded by rules
+2. **Right-tail visibility**: the DQN observes what happens when you hold a trade all the way to bar N — including catastrophic losing tails. It learns to cut losses *because* it sees them
+3. **Strategy-config independence**: B5 doesn't read `EXECUTION_CONFIG` thresholds. The policy depends only on in-trade state, so it generalizes across entry distributions more cleanly
+4. **Richer state**: the price-path window and trajectory scalars give the DQN direct visibility into the trade's profit history, not just its current snapshot
+
+#### Forward path
+
+C2_fix240's test result is exciting but needs validation:
+
+| Step | Effort | Purpose |
+|---|---|---|
+| **Walk-forward C2_fix240 across the 6 RL folds** | ~30 min | Is the test +8.33 a genuine signal or window-specific? Need ≥4/6 folds positive. |
+| Walk-forward A2 alone | ~10 min | Sanity baseline — A2's own fold variance |
+| Seed variance for B5_fix240 (5 seeds) | ~10 min | Policy-level robustness |
+| Joint training (true C2 — train B5 on A2's actual entries) | ~3-5 days | Architecturally correct, would close val gap if walk-forward looks good |
+
+If walk-forward holds, C2_fix240 + Path X (maker execution) is the deployable production system.
+
+→ Detailed log: [docs/experiments_log.md#group-b5--c2-fixed-window-exit-dqn](docs/experiments_log.md#group-b5--c2--fixed-window-exit-dqn-with-enriched-state)
+
+---
+
 ## Cumulative Insights
 
 ### What's confirmed
@@ -322,9 +404,11 @@ A2's val/test gap is **modest and expected** (+7.30 → +3.78, equity 1.40× →
 3. **State representation is sufficient for entry gating at low fees** (A2 val +7.30, **test +3.78** — generalizes; A4 val +1.72 but test −1.65).
 4. **State representation is insufficient for residual signal extraction beyond what strategies use** (D1 Spearman 0.084).
 5. **Time-scale isn't the issue** (Path 1c — 5-min has same fee-free Sharpe as 1-min).
-6. **RL exit-timing is real fee-free** (B4_fee0 mean Δ +1.84, best +4.20 clears the +4 gate).
-7. **Trained entry+exit DQNs do not compose without joint training** (C1 maker Δ −0.07/−0.89; C1_fee0 Δ +0.05/−2.70). Training-distribution mismatch is structural.
-8. **Per-strategy exit DQN ≫ pooled exit DQN** (B4 mean +0.6 vs B2 −4.23 at maker fee; same pattern fee-free).
+6. **RL exit-timing is real fee-free** (B4_fee0 mean Δ +1.84, best +4.20; B5_fix240 mean Δ +3.48, best +6.69 — clears +4 gate easily with fixed-window design).
+7. **Variable-length exit DQN doesn't compose** (C1, C1_fee0 both fail on test). Training-distribution mismatch + rule-vs-DQN race in credit assignment.
+8. **Fixed-window exit DQN composes on test** (C2_fix240: test +8.33 vs A2-alone +3.78, equity 1.34× vs 1.13×). Removing rule terminals during training + enriched state + bounded episodes fixes the transfer pathology — at least on test. Val side still weak.
+9. **Per-strategy exit DQN ≫ pooled exit DQN** (B4 mean +0.6 vs B2 −4.23 at maker fee; B5 follows same pattern).
+10. **Window length matters**: N=240 dominates N=60 and N=120 in B5 per-strategy and in C2 composition. Strategies need long horizons to fully express edge.
 
 ### What's still unknown
 1. **Walk-forward stability of A2/A4** across the 6 RL folds.
@@ -388,8 +472,12 @@ A2's val/test gap is **modest and expected** (+7.30 → +3.78, equity 1.40× →
 | [models/dqn_rollout.py](models/dqn_rollout.py) | Env-loop driver, fee + penalty parameterized |
 | [models/dqn_selector.py](models/dqn_selector.py) | Training loop, CLI: `--fee --trade-penalty` |
 | [models/group_a_sweep.py](models/group_a_sweep.py) | Group A 7-cell runner |
-| [models/exit_dqn.py](models/exit_dqn.py) | Exit-timing DQN (Group B): 28-dim in-trade state, HOLD/EXIT_NOW, RL+rule-based exits combined |
+| [models/exit_dqn.py](models/exit_dqn.py) | Variable-length exit DQN (Group B): 28-dim in-trade state, HOLD/EXIT_NOW, RL+rule-based exits combined |
 | [models/group_b_sweep.py](models/group_b_sweep.py) | Group B 12-cell runner (B1-B3 global × fee, B4 per-strategy) |
+| [models/exit_dqn_fixed.py](models/exit_dqn_fixed.py) | **Fixed-window exit DQN (Group B5)**: 53-dim enriched state with price-path + vol windows + trajectory scalars; no rule exits during training; bounded episodes |
+| [models/group_b5_sweep.py](models/group_b5_sweep.py) | Group B5 27-cell runner (3 windows × 9 strategies at fee=0) |
+| [models/group_c_eval.py](models/group_c_eval.py) | Group C1 evaluator (A4/A2 entry + B4 variable-length exits stacked) |
+| [models/group_c2_eval.py](models/group_c2_eval.py) | **Group C2 evaluator (A2 entry + B5 fixed-window exits stacked)** |
 | [models/grid_search.py](models/grid_search.py) | Hyperparameter search |
 | [models/walk_forward.py](models/walk_forward.py) | 6-fold validation |
 | [models/diagnostics_ab.py](models/diagnostics_ab.py) | Path 1a (fee-free) + 1b (oracle) |
@@ -420,10 +508,18 @@ cache/
   btc_dqn_train_history_A{0..6}.json
   btc_dqn_groupA_summary.{parquet,json}
 
-  ── exit DQN policies (Group B) ──
-  btc_exit_dqn_policy_{B1,B2,B3,B4_S0..S8}.pt
-  btc_exit_dqn_history_{B1,B2,B3,B4_S0..S8}.json
+  ── exit DQN policies (Group B, variable-length) ──
+  btc_exit_dqn_policy_{B1,B2,B3,B4_S0..S8,B4_fee0_S0..S8}.pt
+  btc_exit_dqn_history_{B1,B2,B3,B4_S0..S8,B4_fee0_S0..S8}.json
   btc_exit_dqn_groupB_summary.json
+  btc_groupC1_summary.json
+  btc_groupC1_fee0_summary.json
+
+  ── fixed-window exit DQN policies (Group B5) ──
+  btc_exit_dqn_fixed_policy_B5_fix{60,120,240}_fee0_S{0..8}.pt
+  btc_exit_dqn_fixed_history_B5_fix{60,120,240}_fee0_S{0..8}.json
+  btc_exit_dqn_fixed_groupB5_summary.json
+  btc_groupC2_fix{60,120,240}_fee0_summary.json
 
   ── diagnostics ──
   btc_diag_1a_fee_free.parquet

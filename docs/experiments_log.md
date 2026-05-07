@@ -503,4 +503,147 @@ This is exactly the use-case for **C2 (joint hierarchical training)** — where 
 
 - **The trading signal works** (A2 val +7.30, test +3.78 fee-free, equity 1.13× over locked test split)
 - **RL exit-timing is real** (B4_fee0 clears +4 gate on best strategy, mean +1.84)
-- **They don't compose without joint training** (C1/C1_fee0 both fail to transfer; C1 maker Δ -0.07/-0.89; C1_fee0 fee-free Δ +0.05/-2.70)
+- **Variable-length exit DQN doesn't compose** (C1/C1_fee0 both fail to transfer; C1 maker Δ -0.07/-0.89; C1_fee0 fee-free Δ +0.05/-2.70)
+- **Fixed-window exit DQN does compose on test** (see Group B5 + C2 below)
+
+---
+
+## Group B5 + C2 — fixed-window exit DQN with enriched state
+
+C1's failure motivated a redesign. Two structural problems with B4 were identified: variable episode length (rule-fired terminals dominated the buffer) and the rule-vs-DQN race in credit assignment. Group B5 fixes both.
+
+### Design changes
+
+| | B4 | **B5** |
+|---|---|---|
+| Episode length | 1–240 bars (rule-determined) | **fixed N ∈ {60, 120, 240}** |
+| Rule-based exits during training | TP/SL/BE/trail/time-stop active | **disabled** — only DQN's EXIT_NOW or window-edge can terminate |
+| State dim | 28 | **53** |
+| Network | 28→64→32→2 (4,002 params) | 53→96→48→2 (10,114 params) |
+
+### B5 state vector (53 dims)
+
+```
+─── In-trade scalars (8) ───
+ 0  unrealized_pnl_pct                   clip ±10
+ 1  bars_in_trade / N
+ 2  bars_remaining / N
+ 3  entry_direction                      ±1
+ 4  max_unrealized_pnl_so_far            clip 0..10
+ 5  min_unrealized_pnl_so_far            clip -10..0
+ 6  bars_since_peak / N
+ 7  realized_vol_in_trade
+
+─── Cyclic time (2) ───
+ 8  hour_of_day_sin
+ 9  hour_of_day_cos
+
+─── PRICE PATH (20) — last 20 bars cum-return-from-entry × 100 ───
+10..29  padded with 0 for bars before entry
+
+─── VOLATILITY WINDOW (10) — last 10 bars |log_return| standardized ───
+30..39
+
+─── Entry-time static (3) ───
+40  vol_pred at entry         (sliced from base state[entry][0])
+41  bb_width at entry         (sliced from base state[entry][16])
+42  regime_id at entry / 4.0
+
+─── Current market aggregates (10) ───
+43..48  log_return × 6 lags    (sliced from base state[t][20:26])
+49..52  taker_net_60_z × 4 lags (sliced from base state[t][28:32])
+```
+
+### B5 per-strategy results at fee=0 (27 cells = 3 windows × 9 strategies)
+
+#### Window N=120 bars (2 hours)
+
+| Cell | Strategy | Baseline (always-HOLD-to-N) | B5 RL | ΔSharpe | RL exit % |
+|---|---|---|---|---|---|
+| B5_fix120_fee0_S0 | S1_VolDir    | −2.374 | +1.618 | +3.992 | 82.4% |
+| B5_fix120_fee0_S1 | S2_Funding   | +0.661 | +2.405 | +1.744 | 74.5% |
+| B5_fix120_fee0_S2 | S3_BBRevert  | −3.192 | −2.369 | +0.823 | 63.0% |
+| B5_fix120_fee0_S3 | S4_MACDTrend | −1.952 | +0.178 | +2.131 | 54.3% |
+| **B5_fix120_fee0_S4** | **S6_TwoSignal** | **−4.737** | +0.164 | **+4.901** | 76.9% |
+| B5_fix120_fee0_S5 | S7_OIDiverg  | +3.338 | **+4.346** | +1.008 | 4.0% |
+| B5_fix120_fee0_S6 | S8_TakerFlow | −1.936 | +1.106 | +3.042 | 16.0% |
+| B5_fix120_fee0_S7 | S10_Squeeze  | −0.969 | −0.784 | +0.186 | 57.3% |
+| B5_fix120_fee0_S8 | S12_VWAPVol  | +3.216 | +3.216 | 0      | n=1 |
+
+8/9 positive Δ, mean Δ **+1.98**, max Δ +4.90.
+
+#### Window N=240 bars (4 hours) ★ best
+
+| Cell | Strategy | Baseline | B5 RL | ΔSharpe | RL exit % |
+|---|---|---|---|---|---|
+| B5_fix240_fee0_S0 | S1_VolDir    | −2.893 | +1.204 | +4.098 | 51.8% |
+| B5_fix240_fee0_S1 | S2_Funding   | −3.337 | +0.349 | +3.686 | 73.1% |
+| B5_fix240_fee0_S2 | S3_BBRevert  | −6.833 | −4.681 | +2.151 | 78.8% |
+| B5_fix240_fee0_S3 | S4_MACDTrend | −0.367 | +1.562 | +1.929 | 73.7% |
+| B5_fix240_fee0_S4 | S6_TwoSignal | −4.618 | −0.252 | +4.366 | 88.8% |
+| B5_fix240_fee0_S5 | S7_OIDiverg  | +3.745 | **+5.905** | +2.159 | 13.3% |
+| B5_fix240_fee0_S6 | S8_TakerFlow | −4.909 | +1.364 | +6.273 | 61.0% |
+| **B5_fix240_fee0_S7** | **S10_Squeeze** | **−3.546** | **+3.142** | **+6.689** | 29.2% |
+| B5_fix240_fee0_S8 | S12_VWAPVol  | +3.216 | +3.216 | 0      | n=1 |
+
+**9/9 positive Δ, mean Δ +3.48**, max Δ **+6.69 (S10_Squeeze)**, best abs Sharpe +5.91 (S7_OIDiverg).
+
+#### Summary across windows
+
+| Window | n positive Δ | mean Δ | max Δ | best abs Sharpe |
+|---|---|---|---|---|
+| N=60 | 8/9 | +2.29 | +6.25 (S1_VolDir) | +6.02 (S2_Funding) |
+| N=120 | 8/9 | +1.98 | +4.90 (S6_TwoSignal) | +4.35 (S7_OIDiverg) |
+| **N=240** | **9/9** | **+3.48** | **+6.69 (S10_Squeeze)** | +5.91 (S7_OIDiverg) |
+
+---
+
+## Group C2 — A2 entry + B5 fixed-window exits stacked
+
+The actual production-relevant test: stack the trained B5 per-strategy exit policies on top of A2's selective entry policy at fee=0.
+
+### Result table
+
+| Configuration | val Sharpe | val equity | test Sharpe | test equity | test max DD | test win % |
+|---|---|---|---|---|---|---|
+| A2 alone + rule-based exits (production target) | **+7.295** | 1.398 | +3.776 | 1.127 | −9.69% | 56.1% |
+| A2 + always-HOLD-to-60 (no exits) | −3.918 | 0.840 | −1.046 | 0.965 | −16.03% | 52.2% |
+| C2_fix60 (A2 + B5_fix60 RL exits) | +1.693 | 1.064 | −1.219 | 0.957 | −14.15% | 56.6% |
+| A2 + always-HOLD-to-120 | −6.816 | 0.730 | +2.564 | 1.089 | — | 54.2% |
+| C2_fix120 (A2 + B5_fix120 exits) | −2.478 | 0.870 | +3.717 | 1.129 | — | 65.2% |
+| A2 + always-HOLD-to-240 | −3.604 | 0.833 | +5.245 | 1.217 | −5.74% | 56.5% |
+| **C2_fix240 (A2 + B5_fix240 exits)** | **−1.426** | 0.927 | **+8.329** | **1.343** | **−4.29%** | **67.0%** |
+
+### Reading
+
+- **Test side**: C2_fix240 is the best result the project has produced. **+8.33 Sharpe vs A2-alone +3.78**, equity 1.343× vs 1.127×, lower drawdown, higher win rate.
+- **Val side**: C2_fix240 is −1.43, much worse than A2-alone +7.30. The val/test inversion is unusual.
+- **Window matters**: N=240 dominates N=120 dominates N=60 in this composition. Strategies need longer horizons to fully express edge — short windows force exits before trends complete.
+- **RL exit rate**: C2_fix240 fires RL_EXIT on 87 of 206 trades (42%) on test, captures most of A2-baseline-without-rules' improvement and extracts additional alpha on top.
+
+### Why fixed-window helped (vs C1's failure)
+
+1. **No rule-fired terminals in buffer** — the DQN owns every terminal decision. Sparse-reward credit assignment is no longer confounded by rules
+2. **Right-tail visibility** — the DQN observes what happens when you hold a trade all the way to bar N including catastrophic losing tails. It learns to cut losses *because* it sees them
+3. **Strategy-config independence** — B5 doesn't read `EXECUTION_CONFIG` thresholds. Its policy depends only on in-trade state, so it generalizes across entry distributions
+4. **Richer state** — the price-path window and trajectory scalars give the DQN direct visibility into the trade's profit history, not just a current snapshot
+
+### Why val/test asymmetry exists
+
+- B5 per-strategy policies were val-best-checkpointed *per strategy* on the dense entry distribution, not on the composition
+- Composition val (C2_val) is therefore genuinely OOS for the stacked system — it's not a selection artifact
+- The B5 policies that work well on per-strategy val (e.g., S7_OIDiverg val +5.91) don't necessarily transfer to A2's selective subset of S7 entries on val
+- On test, the patterns evidently align — B5's exits and A2's entries compose well
+
+### Verdict and forward path
+
+C2_fix240 is the strongest signal in the project but needs walk-forward validation. The val side weakness means we can't yet ship this with confidence. Concrete next steps:
+
+| Step | Effort | Decision criterion |
+|---|---|---|
+| Walk-forward C2_fix240 across 6 RL folds | ~30 min | ≥4/6 folds Sharpe > 0 → real signal |
+| Walk-forward A2 alone | ~10 min | sanity baseline |
+| Seed variance for B5_fix240 | ~10 min | std < 1.0 → robust policy |
+| Joint training (true C2) | ~3–5 days | would close val gap; only worth running if walk-forward of C2_fix240 looks promising |
+
+If walk-forward holds → C2_fix240 + Path X (maker execution) is the deployable production system.

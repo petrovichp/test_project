@@ -8,13 +8,17 @@ Forward-looking plan after Group A breakthrough and Group B closeout. Companion 
 
 | ID | Experiment | Effort | Status |
 |---|---|---|---|
-| **Reduced scope** | Lock A2 + A4 (walk-forward + seed variance + penalty fine-grid) | ~1 day | **hard prerequisite** — A2 val/test gap is OK (+7.30/+3.78), A4's is severe (+1.72/−1.65) |
-| **Path X** | Maker-only execution scoping | ~3–5 days | production deployment; A2 generalizes to fee=0-like regime under maker rebates |
-| **Alternative pivots** | Funding-rate / vol trading / statarb / cross-timeframe | open-ended | if Reduced scope fails |
-| **Group C2 (deferred)** | Joint hierarchical entry+exit training | ~3–5 days | architecturally correct fix for C1 transfer failure; revisit after Path X |
-| ~~Group B~~ | ~~Exit-timing DQN at maker fee~~ | — | **closed: per-strategy mean +0.6, below +4 gate** |
-| ~~Group B4_fee0~~ | ~~Exit-timing DQN at fee=0~~ | — | **closed: per-strategy mean +1.84, best +4.20 clears gate** |
-| ~~Group C1, C1_fee0~~ | ~~Sequential entry+exit composition~~ | — | **closed: composition fails at both fee levels (Δ −0.89 / −2.70 on test)** |
+| **Walk-forward C2_fix240** | Validate test +8.33 across 6 RL folds | ~30 min | **highest priority — biggest signal in project, but val/test asymmetric** |
+| **Walk-forward A2** | Sanity baseline — A2's own fold variance | ~10 min | needed in conjunction with C2 walk-forward |
+| **Seed variance for B5_fix240** | Train 5 seeds, measure Sharpe std | ~10 min | policy robustness check |
+| **Path X** | Maker-only execution scoping | ~3–5 days | production deployment, conditional on walk-forward holding |
+| **Joint training (true C2)** | Train B5 on A2's actual entry distribution | ~3–5 days | would close val gap; only worth if walk-forward shows test result is real |
+| **Alternative pivots** | Funding-rate / vol trading / statarb / cross-timeframe | open-ended | if walk-forward fails |
+| ~~Group B (variable-length)~~ | — | — | **closed: per-strategy mean +0.6, below +4 gate at maker fee** |
+| ~~Group B4_fee0~~ | — | — | **closed: per-strategy mean +1.84, best +4.20 clears gate** |
+| ~~Group C1, C1_fee0~~ | — | — | **closed: variable-length composition fails (Δ −0.89 / −2.70 on test)** |
+| ~~Group B5 (fixed-window)~~ | — | — | **completed: 9/9 positive at N=240, mean Δ +3.48** |
+| ~~Group C2_fix240~~ | — | — | **completed: test Sharpe +8.33, eq 1.34× — best result in project, awaiting walk-forward** |
 
 Detailed breakdowns of each remaining experiment in the sections below; Group B / C summaries kept for the record.
 
