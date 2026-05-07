@@ -1,6 +1,6 @@
 # Crypto Trading ML — Project Context
 
-> **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md).**
+> **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md), [docs/data_splits.md](docs/data_splits.md).**
 > Latest findings: (1) DQN entry-gating works at OKX maker fees (Group A4 val Sharpe +1.72). (2) DQN exit-timing does **not** lift over rule-based exits (Group B closed; Group C dropped). Production path is maker-only execution with A4 entry policy.
 
 ## What this project is

@@ -83,15 +83,17 @@ The follow-up Group A sweep retrained the DQN at three fee levels × three penal
 
 **Bar-chunk legend:**
 
-| Chunk | Bars | Approx. dates | Use |
+| Chunk | Bars | Dates | Use |
 |---|---|---|---|
-| Warmup | [0, 1,440) | Jul 4 → Jul 5 2025 | dropped (NaN window) |
-| Vol-train | [1,440, 101,440) | Jul 5 → Sep 19 2025 | LightGBM vol fit + CUSUM thresholds + standardize |
-| Dir-train | [1,440, 91,440) | Jul 5 → Sep 12 2025 | CNN-LSTM training |
-| Dir-holdout | [91,440, 101,440) | Sep 12 → Sep 19 2025 | CNN-LSTM early-stop |
-| DQN-train | [101,440, 281,440) | Sep 19 2025 → Feb 5 2026 | DQN training |
-| DQN-val | [281,440, 332,307) | Feb 5 → Mar 16 2026 | DQN early-stop |
-| DQN-test | [332,307, 384,614) | Mar 16 → Apr 25 2026 | locked, single-shot eval |
+| Warmup | [0, 1,440) | 2025-07-04 → 07-05 | dropped (NaN window) |
+| Vol-train | [1,440, 101,440) | 2025-07-05 → 09-19 | LightGBM vol fit + CUSUM thresholds + standardize |
+| Dir-train | [1,440, 91,440) | 2025-07-05 → 09-12 | CNN-LSTM training |
+| Dir-holdout | [91,440, 101,440) | 2025-09-12 → 09-19 | CNN-LSTM early-stop |
+| DQN-train | [101,440, 281,440) | 2025-09-19 → 2026-02-12 | DQN training |
+| DQN-val | [281,440, 332,307) | 2026-02-12 → 03-20 | DQN early-stop |
+| DQN-test | [332,307, 384,614) | 2026-03-20 → 04-25 | locked, single-shot eval |
+
+→ Full split documentation with date spans and walk-forward folds: [docs/data_splits.md](docs/data_splits.md)
 
 **State arrays:** 50-dim per bar (20 static + 30 windowed lags), saved as `cache/btc_dqn_state_{train,val,test}.npz`. Action mask 10-dim (NO_TRADE + 9 strategies).
 

@@ -2,6 +2,8 @@
 
 Companion to [RESULTS.md](../RESULTS.md). Per-experiment numbers, configurations, and per-fold breakdowns.
 
+For all train/val/test split boundaries (predictive models, RL, walk-forward folds): see [data_splits.md](data_splits.md).
+
 ---
 
 ## Phase 1+2
