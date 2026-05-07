@@ -225,6 +225,45 @@ Three new policies trained at the same hyperparameters as A2 (fee=0, trade_penal
 
 **Decision**: drop all three retrained variants. Final verdict on the audit's surfaced issues stands at "all 5 + 3 retraining variants degrade baseline; no winning variant found."
 
+### Test 6b — Triple ablation (S6 + S7 + S10 simultaneously)
+
+Hypothesis: maybe the three "negative" strategies are jointly redundant, and removing all three together would let the DQN settle into a cleaner policy on the remaining 5 strategies (S1, S2, S3, S4, S8).
+
+```
+python3 -m models.dqn_selector btc --tag A2_no_s6_s7_s10 \
+        --fee 0.0 --trade-penalty 0.001 --ablate-actions 5,6,8
+python3 -m models.group_c2_walkforward --policy-tag A2_no_s6_s7_s10 \
+        --ablate-actions 5,6,8 --no-b5 --out-tag retrain_no_s6_s7_s10
+```
+
+| Metric | Baseline | Triple ablation | Δ |
+|---|---|---|---|
+| Train val Sharpe | +7.30 | +4.66 | −2.64 |
+| WF mean Sharpe | +9.034 | +6.756 | **−2.28** |
+| WF median Sharpe | +9.561 | +8.495 | −1.07 |
+| WF folds positive | 6/6 | 6/6 | — |
+
+**Per-fold:**
+
+| Fold | Baseline | Triple ablation | Δ |
+|---|---|---|---|
+| 1 | +13.03 | +6.36 | −6.67 |
+| 2 | +14.82 | +9.24 | −5.58 |
+| 3 | +6.29 | +8.49 | **+2.20** |
+| 4 | +9.56 | +9.28 | −0.28 |
+| 5 | +8.17 | +4.07 | −4.10 |
+| 6 | +2.33 | +3.09 | **+0.76** |
+
+**Observations**:
+- Triple ablation (Δ −2.28) is *less bad* than single S10 ablation (Δ −3.17). The strategies have overlapping signal — when only S10 is removed, A2's Q-estimates have a "hole" that's filled poorly; when all three are removed, the policy reorganizes more coherently around the remaining 5.
+- Trade count rose to 123–247 trades/fold (vs baseline ~150) — A2 trades more on the remaining strategies.
+- Win rate rose (54–62% vs baseline 50–65%) but Sharpe fell — smaller but more frequent wins, lower per-trade alpha.
+- Folds 3 and 6 improved (+2.20 and +0.76). Folds 1, 2, 5 collapsed (−6.67, −5.58, −4.10).
+
+**Verdict**: still worse than baseline. The signal-overlap among the three ablated strategies is real but not large enough to prevent aggregate degradation. The pattern of improvement on folds 3 and 6 suggests there *might* be regimes where these strategies hurt — but identifying those regimes a priori would require regime-conditional gating, which is out of scope for this experiment series.
+
+Final tally: **6 audit hypotheses × 9 variants tested → 0 winners.**
+
 ## Files / artefacts
 
 | File | Contents |
@@ -240,3 +279,5 @@ Three new policies trained at the same hyperparameters as A2 (fee=0, trade_penal
 | `cache/btc_dqn_policy_A2_no_{s6,s7,s10}.pt` | retrained ablation policies (Test 6) |
 | `cache/btc_dqn_train_history_A2_no_{s6,s7,s10}.json` | retraining histories |
 | `cache/btc_groupC2_walkforward_retrain_no_{s6,s7,s10}.json` | retrain walk-forward results |
+| `cache/btc_dqn_policy_A2_no_s6_s7_s10.pt` | triple-ablation policy (Test 6b) |
+| `cache/btc_groupC2_walkforward_retrain_no_s6_s7_s10.json` | triple-ablation walk-forward result |
