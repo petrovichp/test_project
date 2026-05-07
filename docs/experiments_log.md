@@ -380,8 +380,53 @@ One DQN per entry strategy (9 sub-runs), each trained only on that strategy's en
 The +4-Sharpe gate ("captures ≥30% of actual-vs-oracle gap") was not cleared:
 - Best B4 lift +1.97 << +4
 - B1-B3 negative
-- Group C (stacked entry+exit RL, conditional on B success) is dropped
 
-Rule-based exits already capture the bulk of the per-trade alpha. Future exit improvements would require a different formulation (e.g., per-bar dynamic SL placement rather than binary HOLD/EXIT, or signal-driven exit thresholds inside the strategies themselves). The +28 Sharpe oracle gap remains unclaimed; most of it likely lives in *intra-bar entry timing* (which the DQN cannot see at 1-min resolution) rather than exit selection.
+Per-strategy exit DQN does provide a real, small improvement (mean +0.6, 6/9 positive). Pooling strategies into a single shared exit DQN is actively harmful. Future exit improvements would require a different formulation (e.g., per-bar dynamic SL placement rather than binary HOLD/EXIT, or signal-driven exit thresholds inside the strategies themselves). The +28 Sharpe oracle gap remains largely unclaimed; most of it likely lives in *intra-bar entry timing* (which the DQN cannot see at 1-min resolution) rather than exit selection.
 
-**Production implication:** stick with rule-based exits and Group A4 entry DQN. B4 per-strategy exits provide a small optional lift (~+0.5 mean) but add 9× more model artefacts to maintain — only worth deploying if the entry stack is already locked.
+**Group C handling:** C2 (joint hierarchical training, ~3-5 days) is dropped — joint training only pays off if both stages independently produce strong lifts. C1 (sequential composition of A4 entry + B4 exits, ~hours of code) ran — see Group C section below.
+
+**Production implication:** A4 entry DQN with rule-based exits is the deployable baseline. B4 per-strategy exits add a small optional lift in isolation but **do not transfer when stacked on A4** (see Group C1 below).
+
+---
+
+## Group C1 — A4 entry + B4 per-strategy exits (sequential composition)
+
+- **Module:** [models/group_c_eval.py](../models/group_c_eval.py)
+- **Total runtime:** ~4 seconds (no retraining; reuses A4 + 9× B4 policies)
+
+### Result (internal comparison, same simulator)
+
+| Split | Rule-only (A4 + rule) | Combined (A4 + B4) | ΔSharpe | Δ equity | RL exit % |
+|---|---|---|---|---|---|
+| val  | −5.698 (eq 0.759) | −5.763 (eq 0.752) | **−0.07** | −0.66% | 19.3% |
+| test | −3.765 (eq 0.884) | −4.654 (eq 0.850) | **−0.89** | −3.47% | 23.9% |
+
+### Per-strategy attribution (test split)
+
+| Strategy | rule-only n / meanPnL | combined n / meanPnL | combined ΔmeanPnL |
+|---|---|---|---|
+| S1_VolDir    | 72 / −0.035% | 85 / −0.149% | **−0.114%** |
+| S4_MACDTrend | 10 / +0.330% | 11 / +0.354% | +0.024% |
+| S7_OIDiverg  | 51 / −0.165% | 71 / −0.076% | **+0.089%** |
+| S8_TakerFlow | 56 / +0.065% | 64 / +0.036% | −0.029% |
+
+The B4 exit policy fires too aggressively on S1_VolDir entries (most-traded strategy) — the early exits truncate winners on a strategy that A4 has high confidence in.
+
+### Methodology note — simulator difference
+
+| Evaluator | val Sharpe | test Sharpe | val trades | val mean duration |
+|---|---|---|---|---|
+| `dqn_selector.evaluate_policy` (Group A original, uncapped lookahead) | **+1.715** | **−1.650** | 241 | uncapped |
+| `group_c_eval.evaluate_combined` (240-bar cap to match B4 training) | −5.698 | −3.765 | 326 | ≤240 |
+
+The C1 evaluator caps trade lookahead at 240 bars because B4's state vector includes `n_bars_in_trade / 240` and its policy expects a bounded horizon. This truncates legitimate long-running A4 trades. Within either evaluator the Δ is internally fair, but absolute Sharpe differs. **A4's reported +1.72 is the production-relevant number; the C1 baseline numbers exist only to make the Δ comparison consistent.**
+
+### Decision
+
+C1 confirms that B4 per-strategy exit policies **do not transfer to A4-selected entries**. The training distribution mismatch (sequential first-firing vs A4's selective ~3% picks) is the root cause: B4 learned to bail early on noisy mean trades, but A4 picks higher-quality entries that reward longer holding.
+
+To make joint entry+exit RL work, the exit DQN would need to be retrained on A4's selected entry distribution — which is what C2 (joint hierarchical training, ~3-5 days) was designed to do. **C2 stays dropped** — given C1's negative result (B4 transfer doesn't even break even), the marginal expected value of C2 is low relative to the production-readiness work that's now overdue (A4 walk-forward + seed variance, then Path X).
+
+### Important secondary finding — A4 val/test gap
+
+Group A's headline number was A4 **val** Sharpe +1.72. Re-running through the original simulator on the locked test split gives **−1.65**. A4 has a real val/test degradation that wasn't surfaced in Group A's writeup. **A4 is not yet validated on test** — the "Reduced scope" mini-validation (walk-forward across 6 RL folds + seed variance) is now a hard prerequisite to any production move.

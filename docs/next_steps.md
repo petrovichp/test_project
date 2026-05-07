@@ -8,11 +8,12 @@ Forward-looking plan after Group A breakthrough and Group B closeout. Companion 
 
 | ID | Experiment | Effort | Status |
 |---|---|---|---|
-| **Reduced scope** | Lock A4 (walk-forward + seed variance + penalty fine-grid) | ~1 day | **recommended next** |
-| **Path X** | Maker-only execution scoping | ~3–5 days | production deployment path |
-| **Alternative pivots** | Funding-rate / vol trading / statarb / cross-timeframe | open-ended | if A4 + Path X insufficient |
-| ~~Group B~~ | ~~Exit-timing DQN~~ | — | **closed 2026-05-07: no lift over rule-based exits, see below** |
-| ~~Group C~~ | ~~Stacked entry+exit RL~~ | — | **dropped (was conditional on B clearing +4-Sharpe gate)** |
+| **Reduced scope** | Lock A4 (walk-forward + seed variance + penalty fine-grid) | ~1 day | **hard prerequisite** — A4 val +1.72 but test −1.65 |
+| **Path X** | Maker-only execution scoping | ~3–5 days | production deployment, conditional on Reduced scope passing |
+| **Alternative pivots** | Funding-rate / vol trading / statarb / cross-timeframe | open-ended | if A4 fails Reduced scope |
+| ~~Group B~~ | ~~Exit-timing DQN~~ | — | **closed 2026-05-07: per-strategy gives modest +0.6 mean lift, below +4 gate** |
+| ~~Group C1~~ | ~~A4 entry + B4 exits sequential~~ | — | **closed 2026-05-07: B4 doesn't transfer to A4 entries (Δ -0.07/-0.89)** |
+| ~~Group C2~~ | ~~Stacked entry+exit RL (joint hierarchical)~~ | — | **dropped — given C1 fails, C2 expected value is low** |
 
 Detailed breakdowns of each remaining experiment in the sections below; Group B / C summaries kept for the record.
 
@@ -32,11 +33,17 @@ Step 2: A4 stable?  ── yes → Path X (3-5 days) → paper-trade → live
 
 ---
 
-## Group B — closed (no lift)
+## Group B — closed (small lift, below gate)
 
-Tested in May 2026: 12 cells (3 global × fee level + 9 per-strategy at maker). Verdict: rule-based exits (TP / SL / BE / trail / time-stop) already capture the bulk of per-trade alpha; RL exit-timing on top of them gave **mean Δ +0.6 Sharpe (best +1.97)** in the best per-strategy case, well below the +4-Sharpe gate set as the success criterion. Pooled global exit DQN (B1-B3) was actively negative at every fee level. **Group C was conditional on B clearing the gate and is dropped.** Full numbers in [experiments_log.md § Group B](experiments_log.md#group-b--exit-timing-dqn).
+Tested in May 2026: 12 cells (3 global × fee level + 9 per-strategy at maker).
 
-Lesson: the +28-Sharpe oracle gap most likely lives in *intra-bar entry timing* (sub-1-minute resolution that the current architecture cannot see), not in exit selection. Future exit work would need a different formulation than HOLD/EXIT_NOW (e.g., dynamic SL placement, signal-driven exit thresholds inside the strategies themselves).
+- **B1-B3 (global exit DQN, all strategies pooled):** negative Δ at every fee level (worst −7.55 at taker, best −1.52 at fee=0). Pooling heterogeneous strategies into one shared exit policy is actively harmful.
+- **B4 (per-strategy):** **6/9 strategies improve, mean Δ +0.6, best +1.97** (S8_TakerFlow). Real but small — well below the +4-Sharpe gate set as the success criterion.
+- **C1 (A4 entry + B4 exits, sequential composition):** **does not transfer**. Δ −0.07 val, −0.89 test. B4 was trained on a "sequential first-firing" entry distribution; A4's selective entries (~3% of bars) have different in-trade dynamics, and B4's policy bails too eagerly on them.
+
+Full numbers in [experiments_log.md § Group B](experiments_log.md#group-b--exit-timing-dqn) and [§ Group C1](experiments_log.md#group-c1--a4-entry--b4-per-strategy-exits-sequential-composition).
+
+Lesson: the +28-Sharpe oracle gap most likely lives in *intra-bar entry timing* (sub-1-minute resolution that the current architecture cannot see), not in exit selection. Future exit work would need a different formulation than HOLD/EXIT_NOW (e.g., dynamic SL placement, signal-driven exit thresholds inside the strategies themselves), and would need to be co-trained with the entry policy to avoid the C1 transfer failure.
 
 ---
 
@@ -175,23 +182,27 @@ Only if Groups B/C don't move the needle and A4 alone isn't enough for productio
 
 ---
 
-## Recommended sequencing (post-Group-B)
+## Recommended sequencing (post-Group-B and post-C1)
+
+A4's reported val Sharpe +1.72 has a **−1.65 test Sharpe** when re-evaluated, which surfaced as a side-finding from Group C1. Locking A4 is now a *hard prerequisite*, not just a recommendation.
 
 ```
 Step 1: Reduced scope (~1 day) — lock A4
         ├─ Walk-forward A4 across 6 RL folds
         ├─ Penalty fine-grid at fee=0.0004
-        └─ A4 seed variance (5 seeds)
+        ├─ A4 seed variance (5 seeds)
+        └─ Re-eval A4 on locked test split (currently val +1.72, test −1.65)
         ↓
-Step 2: Decision
-        ├─ A4 walk-forward ≥4/6 positive AND seed std < 1.0 → Path X
-        └─ A4 fragile                                       → pivot to alt alpha
+Step 2: Decision gate
+        ├─ A4 walk-forward ≥4/6 positive AND seed std < 1.0
+        │  AND test ≥ 0  → Path X
+        └─ A4 fragile     → pivot to alternative alpha (funding-rate / vol /
+                             statarb / cross-timeframe)
         ↓
 Step 3: Path X (~4-5 days) — maker execution layer + paper-trade
         ↓
 Step 4: Live with A4 entry + rule-based exits.
-        Optional: bolt on B4 per-strategy exit DQNs (+0.6 mean Sharpe lift)
-        once entry stack is stable.
+        Bolting on B4 per-strategy exit DQNs is NOT recommended given C1 result.
 ```
 
 ---

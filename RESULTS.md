@@ -1,6 +1,6 @@
 # Crypto Trading ML — Results & Conclusions
 
-> **Status (2026-05-07):** RL entry-gating works at maker fees (Group A4: val Sharpe **+1.72**). RL exit-timing tested and **does not lift over rule-based exits** (Group B closed; Group C dropped). Production path remains maker-only execution (Path X) with A4 entry policy.
+> **Status (2026-05-07):** RL entry-gating works on val at maker fees (Group A4: val Sharpe **+1.72**, but **test −1.65** — needs walk-forward validation). RL exit-timing tested in Groups B + C1: per-strategy exit DQNs improve 6/9 strategies in isolation (mean Δ +0.6, best +1.97 Sharpe), but **do not transfer when stacked on A4 entries** (C1: Δ −0.07 val, −0.89 test). Group C2 (joint hierarchical training) dropped. Forward path: lock A4 (walk-forward + seed variance) before Path X.
 
 ---
 
@@ -50,7 +50,7 @@ The follow-up Group A sweep retrained the DQN at three fee levels × three penal
 | Cell | Method | Fee | Penalty | Val Sharpe | Test result | Status |
 |---|---|---|---|---|---|---|
 | **A2** | DQN entry-gate | 0 (fee-free) | 0.001 (0.1%) | **+7.30** | 1.60× equity (val+test 10wk) | best overall ✓ |
-| **A4** | DQN entry-gate | 0.0004 (maker) | 0 | **+1.72** | 0.98× equity (val+test 10wk) | **deployable target ✓** |
+| **A4** | DQN entry-gate | 0.0004 (maker) | 0 | **+1.72** (val) | val eq 1.072, **test Sharpe −1.65 (eq 0.94)** | needs walk-forward validation |
 | A1 | DQN entry-gate | 0 | 0 | +5.81 | — | confirms RL works fee-free |
 | Phase 1a passive | Free-firing strategies | 0 | — | +2.31 grand mean across folds | — | RL adds +5 lift over passive |
 | A0 | DQN entry-gate | 0.0008 (taker) | 0 | −5.87 | 0.67× equity (val+test 10wk) | replicates prior failure ✗ |
@@ -197,7 +197,7 @@ Retrained DQN at 7 (fee, penalty) cells. ~25 minutes total wall time.
 
 ---
 
-### Group B — Exit-timing DQN (NO LIFT)
+### Group B — Exit-timing DQN (small lift, below +4 gate)
 
 Tested whether a 28-dim in-trade state DQN with HOLD/EXIT_NOW actions can improve over rule-based exits (TP/SL/BE/trail/time-stop). 12 cells total: 3 global × fee level + 9 per-strategy at maker fee. Modules: [models/exit_dqn.py](models/exit_dqn.py), [models/group_b_sweep.py](models/group_b_sweep.py).
 
@@ -225,11 +225,41 @@ All three negative. Pooling heterogeneous strategies into one exit DQN actively 
 | S10_Squeeze | −7.88 | −8.20 | −0.33 |
 | S12_VWAPVol | +3.22 | +3.22 | 0 (n=1) |
 
-**6/9 positive, mean Δ ≈ +0.6, best +1.97 (S8_TakerFlow).** Per-strategy is consistently better than pooled, but the lift is too small to clear the +4-Sharpe gate from [docs/next_steps.md](docs/next_steps.md). None of the strategies become profitable at maker fee even with their own exit DQN.
+**6/9 positive, mean Δ ≈ +0.6, best +1.97 (S8_TakerFlow).** Per-strategy exit DQNs reliably extract a small lift over rule-based exits — but it's too small to clear the +4-Sharpe gate from [docs/next_steps.md](docs/next_steps.md) (which targeted "≥30% of the +28 oracle gap"). None of the strategies become profitable at maker fee on stand-alone entries even with their own exit DQN.
 
-**Decision:** Group B closed as a non-improvement. **Group C (stacked entry+exit RL) is dropped** — it was conditional on B clearing the gate. Rule-based exits already capture the bulk of per-trade alpha. The +28 Sharpe oracle gap is most likely intra-bar entry timing (sub-1-minute), which the current architecture cannot address.
+**Decision:** Group B is a *modest* improvement, not the structural breakthrough the gate was designed to detect. **Group C2 (joint hierarchical training, ~3-5 days) is dropped** — joint training only pays off if both stages independently produce strong lifts. **Group C1 (cheap sequential composition: A4 entry + B4 exits)** *is* worth running and was completed — see below.
 
 → Detailed log: [docs/experiments_log.md#group-b](docs/experiments_log.md#group-b--exit-timing-dqn)
+
+---
+
+### Group C1 — A4 entry + B4 per-strategy exits (sequential composition)
+
+- **Module:** [models/group_c_eval.py](models/group_c_eval.py)
+- **Inputs:** trained `cache/btc_dqn_policy_A4.pt` + 9× `cache/btc_exit_dqn_policy_B4_S{k}.pt` (no retraining)
+- **Eval:** A4 picks entries, when a trade fires the corresponding B4_Sk exit DQN takes HOLD/EXIT_NOW decisions on top of the strategy's rule-based exits
+
+**Internal comparison (same evaluator code path, fair Δ):**
+
+| Split | Rule-only (A4 + rule exits) | Combined (A4 + B4 exits) | ΔSharpe | Δ equity |
+|---|---|---|---|---|
+| val  | −5.698 (eq 0.759) | −5.763 (eq 0.752) | **−0.07** | −0.66% |
+| test | −3.765 (eq 0.884) | −4.654 (eq 0.850) | **−0.89** | −3.47% |
+
+**Verdict: B4 exits do not transfer to A4-selected entries.** RL exits fired on 24% of trades, mostly cutting positions early — slightly improved win rate (43.5% → 44.0% on test) but reduced total return because winners got truncated.
+
+**Why the transfer fails:** B4 was trained on the "sequential first-firing" entry distribution (every bar that any strategy fires triggers a trade). A4 picks a much more selective subset (~3% of bars, with NO_TRADE 95-98% of the time). The two distributions have different in-trade dynamics — A4's entries are higher-confidence and reward longer holding periods, but B4's policy was trained to bail early on noisier mean trades.
+
+To make joint entry+exit RL work, you'd need to retrain the exit DQN on A4's entry distribution specifically (which is essentially what C2 — joint hierarchical training — was designed to do). C1's failure is informative but doesn't validate the more expensive C2 investment.
+
+**Methodology note:** Group A reported A4 val Sharpe **+1.72** using `dqn_selector.evaluate_policy` (uncapped trade horizon). My exit-DQN evaluator caps trade lookahead at 240 bars to match B4 training conditions, which truncates some long-running trades and changes the absolute Sharpe (−5.70 above). Within either evaluator, the *Δ* between rule-only and combined is internally valid; the absolute number depends on simulator choice. Re-running A4 through `dqn_selector.evaluate_policy`:
+
+| | val | test |
+|---|---|---|
+| A4 (Group A simulator, uncapped) | +1.715 | **−1.650** |
+| A4 (C1 simulator, 240-bar cap) | −5.698 | −3.765 |
+
+**Important secondary finding:** A4 already shows val/test degradation (val +1.72 → test −1.65 in the original simulator). This hadn't been emphasized in Group A's writeup but matters for deployment — A4 is *not* yet validated on the locked test split. The "Reduced scope" mini-validation (walk-forward + seed variance) is now even more important before any production move.
 
 ---
 
@@ -247,8 +277,8 @@ All three negative. Pooling heterogeneous strategies into one exit DQN actively 
 1. **Walk-forward stability of A4** at maker fee. Group A val/test result is one window.
 2. **Seed sensitivity** of A4 — how robust is the +1.72?
 3. **Real-world fill rates** for maker orders (production scoping).
-4. ~~Whether RL can replace TP/SL with better-than-fixed exits~~ **Resolved (Group B): no, mean lift +0.6 Sharpe, doesn't clear +4 gate.**
-5. ~~Whether stacked entry+exit RL composes cleanly~~ **Group C dropped (was conditional on B success).**
+4. ~~Whether RL can replace TP/SL with better-than-fixed exits~~ **Partially resolved (Group B): yes for 6/9 strategies in B4, but lift is small (mean +0.6 Sharpe, best +1.97), well below the +4 gate. Stand-alone strategies stay unprofitable at maker fee.**
+5. ~~Whether stacked entry+exit RL composes cleanly~~ **C2 (joint hierarchical training) dropped. C1 (sequential composition: A4 entry + B4 exits) ran — see Group C section.**
 
 ---
 
