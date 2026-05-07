@@ -104,7 +104,7 @@ def main():
         eq_vote, sh_vote, eq_v, nt_v = _eval_with_curve(make_vote5, sp, atr_median)
         bh = sp["price"] / sp["price"][0]
 
-        dates = pd.to_datetime(sp["ts"])
+        dates = pd.to_datetime(sp["ts"], unit="s")
 
         ax.plot(dates, eq_full, color="#0a7", lw=1.4,
                 label=f"BASELINE_FULL (Sharpe={sh_full:+.2f}, eq×{eq_f:.3f}, {nt_f} trades)")
@@ -118,8 +118,11 @@ def main():
         ax.set_ylabel("Equity ×")
         ax.grid(alpha=0.3)
         ax.legend(loc="upper left", fontsize=9)
-        ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
+        ax.xaxis.set_major_locator(mdates.DayLocator(interval=5))
+        ax.xaxis.set_minor_locator(mdates.DayLocator(interval=1))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
+        for label in ax.get_xticklabels():
+            label.set_rotation(30); label.set_ha("right")
 
         summary.append({
             "split": split,
