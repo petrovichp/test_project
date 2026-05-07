@@ -225,6 +225,7 @@ def evaluate_policy(net: DQN, state, valid, signals, prices,
         trade_dirs   = trade_dirs,
         trade_strats = trade_strats,
         action_counts= n_actions,
+        eq_curve     = eq_arr,
     )
 
 
