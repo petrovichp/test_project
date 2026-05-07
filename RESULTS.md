@@ -1,10 +1,12 @@
 # Crypto Trading ML — Results & Conclusions
 
-> **Status (2026-05-07, post walk-forward + audit follow-up tests + baselines frozen):**
+> **Status (2026-05-07, post seed-variance analysis):**
+> - **Single-seed metrics are noisy.** 3-seed analysis ([docs/seed_variance.md](docs/seed_variance.md)) of `BASELINE_FULL` shows WF mean Sharpe std **±2.17** and DQN-test Sharpe std **±2.61** across seeds 42/7/123. Seed=7 produced a negative test Sharpe (−1.14, equity 0.955×). The +9.034 figure is one draw from a distribution with mean ~+8.1.
+> - **Most prior "drop" verdicts in audit follow-up were within seed noise.** Δs of 0.5–2 Sharpe between variants are not statistically distinguishable from a single-seed run. The conclusion that no perturbation clearly improved the baseline still holds; the strength of those rejections was overstated.
 > - **Two frozen reference baselines — see [docs/baselines.md](docs/baselines.md):**
->   - **`BASELINE_FULL`** (all 9 strategies): walk-forward mean Sharpe **+9.034**, 6/6 folds positive, primary deployable.
->   - **`BASELINE_LEAN`** (5 strategies, S6/S7/S10 ablated): walk-forward mean Sharpe +6.756, 6/6 folds positive, **wins on locked DQN-test (+5.19 vs +3.67)** and WF folds 3 & 6 — kept as a regime-shifted alternative.
-> - **All future experiments report deltas vs both baselines.**
+>   - **`BASELINE_FULL`** (all 9 strategies): walk-forward mean Sharpe **+9.034 (single seed)** / **+8.09 ± 2.17 (3 seeds)**.
+>   - **`BASELINE_LEAN`** (5 strategies, S6/S7/S10 ablated): walk-forward mean Sharpe +6.756 (single seed). Single-seed Δ vs FULL = −2.28 ≈ 1σ — borderline within noise.
+> - **The signal itself is real**: every seed produces WF mean > 0 and ≥5/6 folds positive. But the magnitude is variable enough that **single-seed deployment is not advisable** — should ensemble or multi-seed.
 > - **5 audit-surfaced perturbations all DEGRADE the baseline** (ablate S6/S10/S7: −0.47/−1.44/−1.39 Sharpe; tighten TP×0.85/0.70: −0.96/−0.60). The baseline is at a local optimum for the search space we explored. Per-strategy attribution from the audit was descriptive, not prescriptive — A2 has learned strategy interactions that aren't visible at per-strategy granularity. See [docs/audit_followup_tests.md](docs/audit_followup_tests.md).
 > - **Test 6 (retrain-with-mask) confirms the audit attribution is non-prescriptive.** Three fresh A2 policies trained from scratch with S6/S7/S10 masked during training+val are *strictly worse* than eval-only masking (Δ −1.64/−2.04/−3.17 vs −0.47/−1.39/−1.44). A fourth retrain with all three masked simultaneously: Δ −2.28 (less bad than single S10 ablation, suggesting signal overlap, but still negative). The masked strategies carry signal A2 depends on for context, even when individual contributions look marginal. Final verdict: **6 audit hypotheses × 9 variants tested → 0 winners.**
 > - **A2 is defensive (anti-correlated with BTC, corr −0.63)** — biggest Sharpe in the worst BTC folds (folds 1, 2, 4 with BTC −6%, −17%, −30%). Short trades carry more aggregate alpha than long trades despite 65% long trade COUNT. The audit's "long-bias warning" was a false alarm.
