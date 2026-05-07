@@ -1,25 +1,27 @@
 # Baselines — reference systems for all future experiments
 
-> Two frozen reference systems. All future experiments report deltas vs both. Reproducible end-to-end from the data files in `cache/` and the commands below.
+> Three frozen reference systems. All future experiments report deltas vs `BASELINE_VOTE5` (strongest) and may include the others for context. Reproducible end-to-end from the data files in `cache/` and the commands below.
 
 ## Quick comparison
 
-| Metric | **BASELINE_FULL** | **BASELINE_LEAN** |
-|---|---|---|
-| Active strategies | 9: S1, S2, S3, S4, S6, S7, S8, S10, S12 | 5: S1, S2, S3, S4, S8 |
-| Action space | NO_TRADE + 9 strategy actions (10 actions) | NO_TRADE + 5 valid + 3 always-masked + S12 (mask applied at training+eval) |
-| Walk-forward mean Sharpe (6 folds) | **+9.034** | +6.756 |
-| Walk-forward median Sharpe | +9.561 | +8.495 |
-| Walk-forward folds positive | 6/6 | 6/6 |
-| DQN-val Sharpe | +7.295 | +4.662 |
-| DQN-test Sharpe | +3.666 | **+5.192** |
-| DQN-val equity | 1.398× | 1.233× |
-| DQN-test equity | 1.127× | 1.195× |
-| Train wall-time | ~145 s | ~85 s (early stop at 45k) |
+| Metric | **BASELINE_VOTE5** ⭐ | **BASELINE_FULL** | **BASELINE_LEAN** |
+|---|---|---|---|
+| Type | Plurality vote ensemble | Single DQN | Single DQN |
+| Constituents | 5 seeds: 42, 7, 123, 0, 99 | 1 seed: 42 | 1 seed: 42 |
+| Active strategies | 9 | 9: S1, S2, S3, S4, S6, S7, S8, S10, S12 | 5: S1, S2, S3, S4, S8 |
+| **Walk-forward mean Sharpe** | **+10.40** | +9.034 | +6.756 |
+| Walk-forward folds positive | **6/6** | 6/6 | 6/6 |
+| Fold 6 Sharpe (hardest fold) | **+5.20** | +2.33 | +3.09 |
+| DQN-val Sharpe | +3.53 | **+7.295** | +4.662 |
+| DQN-test Sharpe | **+4.19** | +3.666 | +5.192 |
+| Trades (full RL period) | 1,122 | ~150/fold | 123–247/fold |
+| Train wall-time | 5 × ~145 s | ~145 s | ~85 s |
 
-**Both beat BTC buy-and-hold on val (+7.2%) and test (+8.6%).**
+**All three beat BTC buy-and-hold on val (+7.2%) and test (+8.6%).**
 
-`BASELINE_FULL` is the primary deployable system (best aggregate walk-forward performance). `BASELINE_LEAN` is retained as a regime-shifted alternative (wins single-shot DQN-test and walk-forward folds 3 & 6, where it appears the regime favors a smaller action space).
+`BASELINE_VOTE5` is the primary deployable system (best WF aggregate, best fold-6, 6/6 folds positive). `BASELINE_FULL` is retained as the strongest single-seed reference (best DQN-val). `BASELINE_LEAN` is retained as a regime-shifted alternative.
+
+`BASELINE_VOTE5` is documented separately in [voting_ensemble.md](voting_ensemble.md). The remainder of this doc covers `BASELINE_FULL` and `BASELINE_LEAN` (both single-seed) — `BASELINE_VOTE5` shares the same training spec but uses 5 seeds aggregated by plurality voting.
 
 ---
 

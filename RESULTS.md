@@ -1,6 +1,7 @@
 # Crypto Trading ML — Results & Conclusions
 
-> **Status (2026-05-07, post seed-variance analysis):**
+> **Status (2026-05-07, post voting-ensemble breakthrough):**
+> - **NEW STRONGEST BASELINE: `BASELINE_VOTE5`** (K=5 plurality ensemble) achieves **WF mean Sharpe +10.40, 6/6 folds positive, fold-6 +5.20** (vs prior best `BASELINE_FULL` single-seed: +9.03 / 6/6 / +2.33). Plurality voting (each net argmaxes independently, most-voted action wins, tie → NO_TRADE) replaces failed Q-averaging. See [docs/voting_ensemble.md](docs/voting_ensemble.md).
 > - **Single-seed metrics are noisy.** 3-seed analysis ([docs/seed_variance.md](docs/seed_variance.md)) of `BASELINE_FULL` shows WF mean Sharpe std **±2.17** and DQN-test Sharpe std **±2.61** across seeds 42/7/123. Seed=7 produced a negative test Sharpe (−1.14, equity 0.955×). The +9.034 figure is one draw from a distribution with mean ~+8.1.
 > - **Most prior "drop" verdicts in audit follow-up were within seed noise.** Δs of 0.5–2 Sharpe between variants are not statistically distinguishable from a single-seed run. The conclusion that no perturbation clearly improved the baseline still holds; the strength of those rejections was overstated.
 > - **Two frozen reference baselines — see [docs/baselines.md](docs/baselines.md):**
