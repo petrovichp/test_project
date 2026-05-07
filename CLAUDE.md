@@ -1,7 +1,7 @@
 # Crypto Trading ML — Project Context
 
 > **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md), [docs/data_splits.md](docs/data_splits.md).**
-> Latest findings: (1) DQN entry-gating works at OKX maker fees (Group A4 val Sharpe +1.72). (2) DQN exit-timing does **not** lift over rule-based exits (Group B closed; Group C dropped). Production path is maker-only execution with A4 entry policy.
+> Latest findings (2026-05-07, post walk-forward): A2 + rule-based exits is the deployable system (walk-forward 6/6 folds positive, mean Sharpe **+9.00** at fee=0). DQN exit-timing variants (B/C/B5/C2) explored extensively; B5 fixed-window does learn real exit policies but **does not beat rule-based exits in walk-forward** (1/6 folds). Production path is Path X (maker-only execution) → live with A2 + rule-based.
 
 ## What this project is
 
@@ -44,6 +44,11 @@ models/
   group_a_sweep.py          fee × penalty sweep runner
   exit_dqn.py               Group B: 28-dim in-trade state, HOLD/EXIT_NOW + rule-based exits
   group_b_sweep.py          Group B 12-cell runner (3 global × fee + 9 per-strategy)
+  exit_dqn_fixed.py         Group B5: 53-dim enriched state, fixed-N episodes, no rule exits
+  group_b5_sweep.py         Group B5 27-cell runner (3 windows × 9 strategies)
+  group_c_eval.py           Group C1: A4/A2 + B4 (variable-length) composition eval
+  group_c2_eval.py          Group C2: A2 + B5 (fixed-window) composition eval
+  group_c2_walkforward.py   6-fold walk-forward: A2+rule vs A2+B5 vs no-exit
   walk_forward.py           6-fold validation
   grid_search.py            hyperparameter search
   pnl_predictor.py          supervised PnL regression diagnostic

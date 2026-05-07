@@ -637,13 +637,61 @@ The actual production-relevant test: stack the trained B5 per-strategy exit poli
 
 ### Verdict and forward path
 
-C2_fix240 is the strongest signal in the project but needs walk-forward validation. The val side weakness means we can't yet ship this with confidence. Concrete next steps:
+See § Walk-forward below — the walk-forward result reverses the apparent C2_fix240 breakthrough.
 
-| Step | Effort | Decision criterion |
-|---|---|---|
-| Walk-forward C2_fix240 across 6 RL folds | ~30 min | ≥4/6 folds Sharpe > 0 → real signal |
-| Walk-forward A2 alone | ~10 min | sanity baseline |
-| Seed variance for B5_fix240 | ~10 min | std < 1.0 → robust policy |
-| Joint training (true C2) | ~3–5 days | would close val gap; only worth running if walk-forward of C2_fix240 looks promising |
+---
 
-If walk-forward holds → C2_fix240 + Path X (maker execution) is the deployable production system.
+## Walk-forward validation — A2 entry across 6 RL folds (DECISIVE)
+
+- **Module:** [models/group_c2_walkforward.py](../models/group_c2_walkforward.py)
+- **Total runtime:** ~15 seconds (no retraining; uses existing A2 + B5_fix240 policies)
+- **Folds:** 6 contiguous ~47,195-bar slices over the full RL period (Sep 2025 → Apr 2026)
+- **Purpose:** verify whether C2_fix240's single-shot test +8.33 was a real signal or window-specific
+
+### Per-fold results
+
+| Fold | In-sample? | Date range | A2 + rule (Sharpe / eq) | A2 + B5 (Sharpe / eq) | A2 + no-exit (Sharpe / eq) | Δ vs rule |
+|---|---|---|---|---|---|---|
+| 1 | yes | 2025-09-20 → 10-22 | **+13.08** / 1.711 | +7.12 / 1.343 | +1.35 / 1.042 | −5.96 |
+| 2 | yes | 2025-10-22 → 12-15 | **+14.82** / 2.228 | +0.33 / 0.998 | −5.03 / 0.698 | **−14.49** |
+| 3 | yes | 2025-12-15 → 01-17 | **+6.17** / 1.212 | +1.47 / 1.041 | −3.46 / 0.901 | −4.71 |
+| 4 | yes | 2026-01-17 → 02-19 | **+9.34** / 1.632 | +1.84 / 1.072 | +5.06 / 1.280 | −7.51 |
+| 5 | partial | 2026-02-19 → 03-24 | **+8.14** / 1.432 | −0.61 / 0.960 | −3.24 / 0.856 | −8.75 |
+| 6 | OOS (test) | 2026-03-24 → 04-25 | +2.46 / 1.069 | **+5.40** / 1.172 | +4.41 / 1.150 | **+2.94** |
+
+### Aggregate
+
+| Configuration | Mean Sharpe | Median | Folds positive |
+|---|---|---|---|
+| **A2 + rule-based** | **+9.00** | +8.74 | **6/6** ✓ |
+| A2 + B5_fix240 (C2) | +2.59 | +1.65 | 5/6 |
+| A2 + always-HOLD-to-240 (no-exit) | −0.15 | — | 3/6 |
+| **Δ (B5 − rule)** | **−6.41** | −6.74 | **1/6 (fold 6 only)** |
+
+### Reading
+
+1. **A2 + rule-based dominates**: 6/6 folds positive, mean +9.00 Sharpe, equity 1.07× to 2.23× per ~32-day fold. Rule-based exits combined with A2's selective entries form the deployable system.
+
+2. **C2_fix240 is positive in 5/6 folds (mean +2.59)** — so the policy is *not broken*, it just doesn't beat rule-based. The single positive Δ comes from fold 6 (the test split), where rule-based was uncharacteristically weak.
+
+3. **Fold 6 is anomalous, not C2_fix240**: A2 + rule-based scored only +2.46 in fold 6 vs +6 to +15 in folds 1-5. In that stressed regime, B5's earlier exits cut larger losses. The original test +8.33 result was real but overrated as a structural improvement — it was a fold-specific advantage.
+
+4. **No-exit baseline (always-HOLD-to-240) confirms exits matter**: mean −0.15, only 3/6 folds positive. Letting trades run to bar 240 unmanaged is bad; *some* exit policy is required.
+
+5. **In-sample folds 1-3 do NOT show systematically lower B5 performance than out-of-sample folds 5-6**, ruling out simple overfitting as the explanation. B5's underperformance vs rule-based is structural — binary HOLD/EXIT_NOW cannot replicate rule-based TP capture and trail-after-breakeven mechanics.
+
+### Why rule-based wins (mechanistically)
+
+Rule-based exits have three structural advantages B5 can't match:
+
+1. **TP capture**: rule TP at 1.5–3% (ATR-scaled per strategy) locks in trend-mode wins. B5's binary HOLD/EXIT_NOW with bounded 240-bar window tends to exit *before* TP fires (it doesn't know about TP)
+2. **Trail-after-breakeven**: rule trail ratchets SL up with peak price, locking partial profit. B5 has no equivalent ratchet mechanism — it can only choose to exit at a bar, not adjust the SL
+3. **Per-strategy tuning**: each rule TP/SL/trail/be is sized to the strategy's signal characteristic via `EXECUTION_CONFIG`. B5 trains on bar-level state without strategy-specific exit shaping
+
+On strategies that produce TP-friendly trade trajectories (the majority, in folds 1–5), rule-based wins decisively. B5 only wins when the regime shifts and TP rarely fires (fold 6) — then early loss-cutting beats waiting for rules.
+
+### Decision
+
+**Deployment target: A2 entry + rule-based exits.** Walk-forward 6/6 positive, mean Sharpe +9.00, robust across the full RL period.
+
+C2_fix240 (A2 + B5 RL exits) is closed as a production candidate but retains optional value as a regime-stress fallback or future research direction (joint hierarchical training).

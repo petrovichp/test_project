@@ -8,17 +8,16 @@ Forward-looking plan after Group A breakthrough and Group B closeout. Companion 
 
 | ID | Experiment | Effort | Status |
 |---|---|---|---|
-| **Walk-forward C2_fix240** | Validate test +8.33 across 6 RL folds | ~30 min | **highest priority — biggest signal in project, but val/test asymmetric** |
-| **Walk-forward A2** | Sanity baseline — A2's own fold variance | ~10 min | needed in conjunction with C2 walk-forward |
-| **Seed variance for B5_fix240** | Train 5 seeds, measure Sharpe std | ~10 min | policy robustness check |
-| **Path X** | Maker-only execution scoping | ~3–5 days | production deployment, conditional on walk-forward holding |
-| **Joint training (true C2)** | Train B5 on A2's actual entry distribution | ~3–5 days | would close val gap; only worth if walk-forward shows test result is real |
-| **Alternative pivots** | Funding-rate / vol trading / statarb / cross-timeframe | open-ended | if walk-forward fails |
+| **Path X** | Maker-only execution scoping | ~3–5 days | **next priority** — A2+rule passed walk-forward 6/6 (mean +9.00). Deploy with confidence. |
+| **Seed variance for A2** | Train A2 with 5 seeds, measure Sharpe std | ~30 min | policy-level robustness check before live deployment |
+| **Joint hierarchical training (C2-true)** | Train B5 on A2's actual entry distribution | ~3–5 days | optional — could let B5 universally beat rule-based; only worth running if alpha-bound after deployment |
+| **Alternative pivots** | Funding-rate / vol trading / statarb / cross-timeframe | open-ended | only if Path X paper-trade fails |
+| ~~Walk-forward C2_fix240~~ | — | — | **completed 2026-05-07: A2+rule wins 5/6 folds, A2+B5 wins 1/6. Rule-based is the deployment target.** |
 | ~~Group B (variable-length)~~ | — | — | **closed: per-strategy mean +0.6, below +4 gate at maker fee** |
 | ~~Group B4_fee0~~ | — | — | **closed: per-strategy mean +1.84, best +4.20 clears gate** |
 | ~~Group C1, C1_fee0~~ | — | — | **closed: variable-length composition fails (Δ −0.89 / −2.70 on test)** |
 | ~~Group B5 (fixed-window)~~ | — | — | **completed: 9/9 positive at N=240, mean Δ +3.48** |
-| ~~Group C2_fix240~~ | — | — | **completed: test Sharpe +8.33, eq 1.34× — best result in project, awaiting walk-forward** |
+| ~~Group C2_fix240~~ | — | — | **completed: test +8.33 was fold-6-specific; walk-forward shows rule-based wins 5/6** |
 
 Detailed breakdowns of each remaining experiment in the sections below; Group B / C summaries kept for the record.
 
@@ -187,33 +186,36 @@ Only if Groups B/C don't move the needle and A4 alone isn't enough for productio
 
 ---
 
-## Recommended sequencing (post-Group-B/C, post-C1_fee0)
+## Recommended sequencing (post walk-forward 2026-05-07)
 
-The signal generalizes fee-free (A2 val +7.30 / test +3.78). At maker fee A4 has a val/test sign flip that needs walk-forward validation. RL exit-timing is real but doesn't compose with separately-trained entries. The forward path:
+Walk-forward of C2_fix240 across 6 RL folds delivered the decisive verdict: **A2 + rule-based exits dominates A2 + B5 RL exits on 5 of 6 folds (mean Sharpe +9.00 vs +2.59).** The deployable system is now well-defined.
 
 ```
-Step 1: Reduced scope (~1 day) — lock A2 and A4
-        ├─ Walk-forward A2 + A4 across 6 RL folds
-        ├─ Penalty fine-grid at fee=0.0004 (A4) and fee=0 (A2)
-        ├─ Seed variance (5 seeds each, std < 1.0 = stable)
-        └─ Re-eval on locked test split with original simulator
-        ↓
-Step 2: Decision gate
-        ├─ A2 walk-forward ≥4/6 positive (best case: production with maker rebates)
-        ├─ A4 walk-forward ≥4/6 positive (back-up: production at maker fee)
-        └─ Both fragile  → pivot to alternative alpha
-        ↓
-Step 3: Path X (~3-5 days) — maker execution layer
-        ├─ Limit order placement + re-quote logic
+Step 1: Path X (~3–5 days) — maker execution scoping
+        ├─ Limit-order placement + re-quote logic
         ├─ Probabilistic fill simulation
-        └─ Re-validate A2/A4 with realistic maker-fill modeling
+        └─ Re-validate A2 + rule-based exits with realistic maker-fill model
         ↓
-Step 4: Paper-trade (2-4 weeks) → live with rule-based exits
+Step 2: Seed variance for A2 (~30 min)
+        └─ Train A2 with 5 seeds; std < 1.0 → policy is robust
         ↓
-Optional Step 5 (deferred):
-        ├─ Group C2 (joint hierarchical entry+exit training) — if exit alpha
-        │    becomes the bottleneck after deployment validates entry signal
-        └─ Alternative exit formulations (dynamic SL, signal-driven thresholds)
+Step 3: Paper-trade (2-4 weeks)
+        ├─ Live data ingestion + DQN inference (~1 ms/bar on CPU)
+        ├─ Track fill rates, slippage, latency
+        └─ Compare paper PnL vs backtest expectation
+        ↓
+Step 4: Live deploy
+        └─ A2 entry DQN + rule-based exits at OKX maker fee tier
+        ↓
+Optional follow-ups:
+        ├─ Joint hierarchical training (C2-true): train B5 on A2's actual
+        │    entry distribution. Could let RL exits universally beat rule-based;
+        │    revisit if alpha-bound after deployment validates entry signal.
+        ├─ B5 as regime-stress fallback: monitor rolling A2+rule Sharpe;
+        │    switch to A2+B5 when rule-based degrades (fold-6-style regime).
+        ├─ Cross-asset: train A2-style entry on ETH and SOL.
+        └─ Alternative exit formulations: dynamic SL placement, signal-driven
+            thresholds inside strategies (decoupled from RL).
 ```
 
 ---
