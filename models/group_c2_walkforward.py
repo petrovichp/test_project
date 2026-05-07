@@ -106,9 +106,9 @@ def _restore_exec_config_tp(saved: dict):
         EXECUTION_CONFIG[key].exit.base_tp = original
 
 
-def _load_a2_policy(ticker: str = "btc") -> DQN:
+def _load_a2_policy(ticker: str = "btc", policy_tag: str = "A2") -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"{ticker}_dqn_policy_A2.pt",
+    net.load_state_dict(torch.load(CACHE / f"{ticker}_dqn_policy_{policy_tag}.pt",
                                      map_location="cpu"))
     net.eval()
     return net
@@ -220,7 +220,8 @@ def _evaluate_a2_b5(entry_net, exit_nets, base_state, valid, signals, prices,
 
 def run(ticker: str = "btc", N: int = 240, fee: float = 0.0,
          ablate_actions: list = None, tp_scale: float = 1.0,
-         out_tag: str = None, run_b5_eval: bool = True):
+         out_tag: str = None, run_b5_eval: bool = True,
+         policy_tag: str = "A2"):
     """
     ablate_actions : list of action indices [1..9] to mask out of A2's action space
     tp_scale       : multiply base_tp_pct of the 5 trend strategies by this
@@ -244,8 +245,8 @@ def run(ticker: str = "btc", N: int = 240, fee: float = 0.0,
     print(f"  Output tag: {out_tag}")
 
     # ── load policies & data ────────────────────────────────────────────────
-    print(f"  Loading A2 entry policy ...")
-    entry_net = _load_a2_policy(ticker)
+    print(f"  Loading entry policy: {policy_tag} ...")
+    entry_net = _load_a2_policy(ticker, policy_tag=policy_tag)
     if run_b5_eval:
         print(f"  Loading 9× B5_fix{N}_fee0_S0..8 ...")
         exit_nets = _load_b5_policies(ticker, N=N)
@@ -456,6 +457,8 @@ if __name__ == "__main__":
                      help="output JSON suffix (default: 'fix{N}')")
     ap.add_argument("--no-b5", action="store_true", dest="no_b5",
                      help="skip A2+B5 RL exit and no-exit baselines (saves time)")
+    ap.add_argument("--policy-tag", default="A2", dest="policy_tag",
+                     help="entry policy file suffix → cache/<ticker>_dqn_policy_<tag>.pt (default A2)")
     args = ap.parse_args()
 
     # parse ablate-actions
@@ -465,4 +468,5 @@ if __name__ == "__main__":
 
     run(args.ticker, N=args.window_n, fee=args.fee,
          ablate_actions=ablate, tp_scale=args.tp_scale,
-         out_tag=args.out_tag, run_b5_eval=not args.no_b5)
+         out_tag=args.out_tag, run_b5_eval=not args.no_b5,
+         policy_tag=args.policy_tag)

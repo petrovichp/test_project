@@ -231,7 +231,8 @@ def evaluate_policy(net: DQN, state, valid, signals, prices,
 # ── main training ────────────────────────────────────────────────────────────
 
 def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
-           tag: str = "v1", fee: float = None, trade_penalty: float = 0.0):
+           tag: str = "v1", fee: float = None, trade_penalty: float = 0.0,
+           ablate_actions: list = None):
     torch.manual_seed(seed); np.random.seed(seed)
     rng_warm = np.random.default_rng(seed)
     rng_eps  = np.random.default_rng(seed + 1)
@@ -255,6 +256,16 @@ def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
         valid_override[0] = True
         valid_override[1] = True
         print(f"  Path C: action mask restricted to {{NO_TRADE, S1_VolDir}}")
+    elif ablate_actions:
+        # ablate selected strategy actions; NO_TRADE always preserved
+        valid_override = np.ones(10, dtype=np.bool_)
+        for idx in ablate_actions:
+            if 1 <= idx <= 9:
+                valid_override[idx] = False
+        valid_override[0] = True
+        from models.dqn_rollout import STRAT_KEYS as _SK
+        names = [_SK[i-1] for i in ablate_actions if 1 <= i <= 9]
+        print(f"  ABLATION: actions {ablate_actions} → strategies {names} masked during training+val")
 
     # ── load DQN-train and DQN-val arrays ────────────────────────────────────
     sp_tr = np.load(CACHE / f"{ticker}_dqn_state_train.npz")
@@ -436,6 +447,10 @@ if __name__ == "__main__":
                      help="per-side fee (default = TAKER_FEE = 0.0008)")
     ap.add_argument("--trade-penalty", type=float, default=0.0, dest="trade_penalty",
                      help="fixed penalty per trade entry in buffer reward (default 0)")
+    ap.add_argument("--ablate-actions", default="", dest="ablate_actions",
+                     help="comma-separated action indices [1..9] to mask during training "
+                          "(e.g. '5' masks S6_TwoSignal, '5,8' masks S6+S10)")
     args = ap.parse_args()
+    ablate = [int(x) for x in args.ablate_actions.split(",") if x.strip()]
     train(args.ticker, seed=args.seed, action_mode=args.mode, tag=args.tag,
-           fee=args.fee, trade_penalty=args.trade_penalty)
+           fee=args.fee, trade_penalty=args.trade_penalty, ablate_actions=ablate)

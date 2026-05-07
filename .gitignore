@@ -14,3 +14,4 @@ venv/
 .venv/
 *.egg-info/
 collection/okx_ob_download_v3/env.yaml
+.claude/scheduled_tasks.lock

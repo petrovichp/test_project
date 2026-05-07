@@ -192,6 +192,39 @@ User asked: "firstly independent, then we make analysis and decide how better to
 
 5. **Future research direction** (out of scope here): regime-conditional strategy gating (e.g., mask S7 only in detected up-regimes). Group A's `regime_id` state input could be used to re-train an A3-style policy that learns regime-conditional masks. Worth ~1 day of work if alpha-bound after deployment.
 
+## Test 6 — Ablate S6 / S7 / S10 with **fresh A2 retraining** (added 2026-05-07)
+
+The 5 tests above all applied the action mask **only at evaluation time** on the original A2 policy. That leaves the question: *would a fresh A2 trained from scratch with the strategy disabled learn to reallocate to other strategies and recover the lost Sharpe?*
+
+Three new policies trained at the same hyperparameters as A2 (fee=0, trade_penalty=0.001, seed=42, action_mode=all but with `--ablate-actions` plumbed through both rollouts AND validation):
+
+| Variant | Train-val best Sharpe | Walk-forward mean Sharpe | Δ vs baseline | Eval-only Δ (for comparison) |
+|---|---|---|---|---|
+| **A2 baseline** | +7.30 | **+9.034** | 0 | 0 |
+| A2_no_s6 (retrain) | +5.19 | +7.398 | **−1.636** | −0.471 |
+| A2_no_s7 (retrain) | +4.37 | +6.994 | **−2.040** | −1.391 |
+| A2_no_s10 (retrain) | +2.86 | +5.860 | **−3.174** | −1.437 |
+
+**Per-fold rule Sharpe (retrain runs):**
+
+| Variant | F1 | F2 | F3 | F4 | F5 | F6 |
+|---|---|---|---|---|---|---|
+| baseline | 13.03 | 14.82 | 6.29 | 9.56 | 8.17 | 2.33 |
+| no_s6  retrain | 9.67 | 11.95 | 5.74 | 8.59 | 5.24 | 3.20 |
+| no_s7  retrain | 7.58 | 8.79 | 11.07 | 6.58 | 5.09 | 2.85 |
+| no_s10 retrain | 11.59 | 12.93 | 5.54 | 1.49 | 2.72 | 0.90 |
+
+**Outcome — retraining is strictly worse than eval-only masking** in all 3 cases. The hypothesis that "the DQN will reallocate" is falsified.
+
+**Why this is the result**:
+- *Eval-only* masking preserves A2's learned Q-function; only the bars where A2 picks the masked action lose value (they get NO_TRADE substituted).
+- *Retraining* reshapes the entire policy. The DQN sees a smaller action set during training, which means it sees fewer reward signals and the value estimates for ALL state-action pairs shift. The training-val Sharpe drop (+7.30 → +2.86 for no_s10) shows the *training problem itself* gets harder when the strategy is removed.
+- The masked strategies aren't redundant — they carry specialized signal that A2's policy depends on for context, even when their per-trade contribution looks marginal.
+
+**This is the most direct possible test of the audit's per-strategy attribution claim** — and it confirms: removing a strategy degrades A2 even when given full opportunity to retrain around the gap. The audit's "tests worth pursuing" framing was wrong; per-strategy summed PnL is purely descriptive.
+
+**Decision**: drop all three retrained variants. Final verdict on the audit's surfaced issues stands at "all 5 + 3 retraining variants degrade baseline; no winning variant found."
+
 ## Files / artefacts
 
 | File | Contents |
@@ -204,3 +237,6 @@ User asked: "firstly independent, then we make analysis and decide how better to
 | `cache/btc_groupC2_walkforward_test4{a,b}_tp*.json` | TP tightening tests |
 | `cache/test5_inversion_results.json` | synthetic inversion per-fold details |
 | `cache/test5_btc_vs_sharpe.png` | scatter plot of BTC return vs A2 Sharpe |
+| `cache/btc_dqn_policy_A2_no_{s6,s7,s10}.pt` | retrained ablation policies (Test 6) |
+| `cache/btc_dqn_train_history_A2_no_{s6,s7,s10}.json` | retraining histories |
+| `cache/btc_groupC2_walkforward_retrain_no_{s6,s7,s10}.json` | retrain walk-forward results |
