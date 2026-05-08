@@ -233,7 +233,7 @@ def evaluate_policy(net: DQN, state, valid, signals, prices,
 
 def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
            tag: str = "v1", fee: float = None, trade_penalty: float = 0.0,
-           ablate_actions: list = None):
+           ablate_actions: list = None, state_version: str = "v5"):
     torch.manual_seed(seed); np.random.seed(seed)
     rng_warm = np.random.default_rng(seed)
     rng_eps  = np.random.default_rng(seed + 1)
@@ -269,8 +269,11 @@ def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
         print(f"  ABLATION: actions {ablate_actions} → strategies {names} masked during training+val")
 
     # ── load DQN-train and DQN-val arrays ────────────────────────────────────
-    sp_tr = np.load(CACHE / f"{ticker}_dqn_state_train.npz")
-    sp_v  = np.load(CACHE / f"{ticker}_dqn_state_val.npz")
+    suffix = "" if state_version == "v5" else f"_{state_version}"
+    sp_tr = np.load(CACHE / f"{ticker}_dqn_state_train{suffix}.npz")
+    sp_v  = np.load(CACHE / f"{ticker}_dqn_state_val{suffix}.npz")
+    state_dim = int(sp_tr["state"].shape[1])
+    print(f"  state_version={state_version}  state_dim={state_dim}")
     print(f"  DQN-train: state {sp_tr['state'].shape}")
     print(f"  DQN-val  : state {sp_v['state'].shape}")
 
@@ -287,12 +290,12 @@ def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
         sp_v["price"], sp_v["atr"], atr_median)
 
     # ── networks + optimizer + buffer ────────────────────────────────────────
-    online = DQN(state_dim=50, n_actions=10, hidden=64)
-    target = DQN(state_dim=50, n_actions=10, hidden=64)
+    online = DQN(state_dim=state_dim, n_actions=10, hidden=64)
+    target = DQN(state_dim=state_dim, n_actions=10, hidden=64)
     target.load_state_dict(online.state_dict())
     target.eval()
     optimizer = torch.optim.Adam(online.parameters(), lr=LR)
-    buf = ReplayBuffer(capacity=BUFFER_SIZE, state_dim=50, n_actions=10)
+    buf = ReplayBuffer(capacity=BUFFER_SIZE, state_dim=state_dim, n_actions=10)
 
     print(f"  online net params: {online.n_params():,}  optimizer Adam lr={LR}")
 
@@ -451,7 +454,11 @@ if __name__ == "__main__":
     ap.add_argument("--ablate-actions", default="", dest="ablate_actions",
                      help="comma-separated action indices [1..9] to mask during training "
                           "(e.g. '5' masks S6_TwoSignal, '5,8' masks S6+S10)")
+    ap.add_argument("--state-version", default="v5", dest="state_version",
+                     choices=["v5", "v6"],
+                     help="state-array version: v5=50-dim (default), v6=54-dim with direction probs")
     args = ap.parse_args()
     ablate = [int(x) for x in args.ablate_actions.split(",") if x.strip()]
     train(args.ticker, seed=args.seed, action_mode=args.mode, tag=args.tag,
-           fee=args.fee, trade_penalty=args.trade_penalty, ablate_actions=ablate)
+           fee=args.fee, trade_penalty=args.trade_penalty, ablate_actions=ablate,
+           state_version=args.state_version)
