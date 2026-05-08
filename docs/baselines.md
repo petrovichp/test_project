@@ -4,18 +4,18 @@
 
 ## Quick comparison
 
-| Metric | **BASELINE_VOTE5** ⭐ | **BASELINE_FULL** | **BASELINE_LEAN** |
-|---|---|---|---|
-| Type | Plurality vote ensemble | Single DQN | Single DQN |
-| Constituents | 5 seeds: 42, 7, 123, 0, 99 | 1 seed: 42 | 1 seed: 42 |
-| Active strategies | 9 | 9: S1, S2, S3, S4, S6, S7, S8, S10, S12 | 5: S1, S2, S3, S4, S8 |
-| **Walk-forward mean Sharpe** | **+10.40** | +9.034 | +6.756 |
-| Walk-forward folds positive | **6/6** | 6/6 | 6/6 |
-| Fold 6 Sharpe (hardest fold) | **+5.20** | +2.33 | +3.09 |
-| DQN-val Sharpe | +3.53 | **+7.295** | +4.662 |
-| DQN-test Sharpe | **+4.19** | +3.666 | +5.192 |
-| Trades (full RL period) | 1,122 | ~150/fold | 123–247/fold |
-| Train wall-time | 5 × ~145 s | ~145 s | ~85 s |
+| Metric | **VOTE5** | **VOTE5_DISJOINT** ⭐test/f6 | **FULL** | **LEAN** |
+|---|---|---|---|---|
+| Type | Plurality vote ensemble | Plurality vote ensemble | Single DQN | Single DQN |
+| Constituents | 5 seeds: 42, 7, 123, 0, 99 | 5 seeds: 1, 13, 25, 50, 77 | 1 seed: 42 | 1 seed: 42 |
+| Active strategies | 9 | 9 | 9 | 5: S1,S2,S3,S4,S8 |
+| **Walk-forward mean Sharpe** | **+10.40** | +10.06 | +9.034 | +6.756 |
+| Walk-forward folds positive | 6/6 | 6/6 | 6/6 | 6/6 |
+| Fold 6 Sharpe (hardest fold) | +5.20 | **+6.11** | +2.33 | +3.09 |
+| DQN-val Sharpe | +3.53 | +3.79 | **+7.295** | +4.662 |
+| DQN-test Sharpe | +4.19 | **+6.45** | +3.666 | +5.192 |
+| Trades (full RL period) | 1,122 | 1,292 | ~150/fold | 123–247/fold |
+| Train wall-time | 5 × ~145 s | 5 × ~145 s | ~145 s | ~85 s |
 
 **All three beat BTC buy-and-hold on val (+7.2%) and test (+8.6%).**
 

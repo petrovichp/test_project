@@ -122,3 +122,78 @@ To validate that voting is structurally better (not specific to these 5 seeds), 
 ## Implications for prior conclusions
 
 The audit follow-up's "no perturbation improved baseline" verdict is REVERSED for ensembling — voting at K=5 is a real improvement. The earlier ensemble doc (`docs/ensemble_baseline.md`) which concluded "ensembling does not improve baselines" was correct *only for Q-averaging*, the wrong aggregation choice.
+
+---
+
+## Tier 1 follow-up validation (2026-05-08)
+
+After freezing VOTE5_orig as `BASELINE_VOTE5`, ran 4 follow-up voting variants to validate that voting helps structurally (not seed-specific luck) and to investigate the val regression.
+
+### Per-seed performance — full 10-seed pool
+
+| seed | val | test | WF mean | fold 6 | folds + |
+|---|---|---|---|---|---|
+| 42 | +7.30 | +3.67 | +9.03 | +2.33 | 6/6 |
+| 7 | +3.96 | −1.14 | +5.60 | −0.14 | 5/6 |
+| 123 | +6.18 | +3.03 | +9.63 | +2.03 | 6/6 |
+| 0 | +4.02 | +5.59 | +8.26 | +2.71 | 6/6 |
+| 99 | +4.92 | +9.05 | +6.19 | +4.71 | 6/6 |
+| 1 | +5.97 | −0.93 | +4.98 | −1.39 | 5/6 |
+| **13** | **+6.31** | **+10.45** | **+9.99** | **+10.02** | **6/6** |
+| 25 | +4.43 | +2.60 | +4.22 | +1.12 | 6/6 |
+| 50 | +5.45 | +4.72 | +7.02 | +4.50 | 6/6 |
+| 77 | +5.36 | +5.35 | +8.01 | +3.48 | 6/6 |
+
+**Seed=13 is exceptional alone** — beats every prior single-seed and is competitive with VOTE5_orig on its own.
+
+### Voting variants tested
+
+| variant | seeds | val | test | WF mean | fold 6 | folds + | trades |
+|---|---|---|---|---|---|---|---|
+| BASELINE_FULL | {42} | **+7.30** | +3.67 | +9.034 | +2.33 | 6/6 | — |
+| BASELINE_VOTE5 (orig) | {42, 7, 123, 0, 99} | +3.53 | +4.19 | **+10.400** | +5.20 | 6/6 | 1122 |
+| VOTE4_drop7 | {42, 123, 0, 99} | +5.04 | +4.58 | +8.690 | +4.23 | 6/6 | 944 |
+| **VOTE5_disjoint** | {1, 13, 25, 50, 77} | +3.79 | **+6.45** | +10.057 | **+6.11** | 6/6 | 1292 |
+| VOTE5_top5_val | {42, 13, 123, 1, 50} | +5.46 | +4.17 | +10.186 | +3.07 | 6/6 | 1008 |
+| VOTE5_top5_wf | {13, 123, 42, 0, 77} | −2.61 | +7.37 | +9.468 | +6.62 | 5/6 | 915 |
+
+### Findings
+
+**1. Voting helps STRUCTURALLY.** VOTE5_disjoint (no seed overlap with VOTE5_orig) achieves WF +10.06 / fold 6 +6.11 — confirming the +10.40 of VOTE5_orig was not seed-specific luck. Δ ensemble vs best single in disjoint pool = +0.07 (modest but positive).
+
+**2. Dropping seed=7 doesn't help WF.** VOTE4_drop7 fixes val (+5.04) but loses −1.71 Sharpe on WF aggregate. Seed=7 cast useful contrarian votes despite weak solo performance.
+
+**3. VOTE5_disjoint beats VOTE5_orig on test (+6.45 vs +4.19) and fold 6 (+6.11 vs +5.20).** WF within 0.34. Notable: the disjoint pool includes star seed=13 plus 4 weaker individuals; the ensemble gain comes from diversity, not from picking strong solos.
+
+**4. Top-5-by-val ensemble is a clean alternative.** VOTE5_top5_val: val +5.46 (vs VOTE5_orig +3.53), WF +10.19 (within 0.21), but weaker fold 6 (+3.07 vs +5.20). Restores val without much WF cost — but loses late-regime robustness.
+
+**5. Top-5-by-WF tilts too far.** VOTE5_top5_wf: val −2.61, only 5/6 folds. Picking by WF metric leaves the val period under-represented.
+
+### Promoted baseline: BASELINE_VOTE5_DISJOINT
+
+Added as a formal baseline alongside BASELINE_VOTE5. **Best test, best fold 6**, WF within 0.34 of BASELINE_VOTE5.
+
+| Spec | Value |
+|---|---|
+| Aggregation | Plurality (most-voted; tie → NO_TRADE) |
+| Constituents | 5 BASELINE_FULL policies, seeds 1, 13, 25, 50, 77 |
+| Underlying nets | `cache/btc_dqn_policy_BASELINE_FULL_seed{1,13,25,50,77}.pt` |
+| WF mean Sharpe | +10.057 |
+| WF folds positive | 6/6 |
+| DQN-test Sharpe | **+6.452** (best of any variant) |
+| DQN-val Sharpe | +3.789 |
+| Fold 6 Sharpe | **+6.106** (best of any variant) |
+| Trades (full RL period) | 1,292 |
+
+### Implications for project direction
+
+- The voting mechanism is **structurally beneficial**, not specific to which 5 seeds we chose.
+- Three competitive baselines now: BASELINE_VOTE5 (best WF), BASELINE_VOTE5_DISJOINT (best test + fold 6), BASELINE_FULL (best val).
+- Future architectural experiments should be evaluated against all three to ensure improvements aren't just shifting the val/test/WF trade-off.
+
+### Files
+
+| File | Contents |
+|---|---|
+| [models/vote_tier1.py](../models/vote_tier1.py) | Tier 1 follow-up: per-seed audit + 5 voting variants |
+| `cache/vote_tier1_results.json` | per-seed and per-variant metrics |

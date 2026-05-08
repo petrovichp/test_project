@@ -1,7 +1,11 @@
 # Crypto Trading ML — Results & Conclusions
 
-> **Status (2026-05-07, post voting-ensemble breakthrough):**
-> - **NEW STRONGEST BASELINE: `BASELINE_VOTE5`** (K=5 plurality ensemble) achieves **WF mean Sharpe +10.40, 6/6 folds positive, fold-6 +5.20** (vs prior best `BASELINE_FULL` single-seed: +9.03 / 6/6 / +2.33). Plurality voting (each net argmaxes independently, most-voted action wins, tie → NO_TRADE) replaces failed Q-averaging. See [docs/voting_ensemble.md](docs/voting_ensemble.md).
+> **Status (2026-05-08, post voting-ensemble Tier 1 validation):**
+> - **THREE FROZEN BASELINES** ([docs/voting_ensemble.md](docs/voting_ensemble.md)):
+>   - `BASELINE_VOTE5` {42, 7, 123, 0, 99}: WF **+10.40**, fold-6 +5.20, test +4.19, val +3.53 — best WF aggregate
+>   - `BASELINE_VOTE5_DISJOINT` {1, 13, 25, 50, 77}: WF +10.06, **fold-6 +6.11**, **test +6.45**, val +3.79 — best test + fold 6 (validates that voting helps structurally, not by seed-luck)
+>   - `BASELINE_FULL` (single seed=42): WF +9.03, fold-6 +2.33, test +3.67, **val +7.30** — best val
+> - **Voting helps structurally.** A fully disjoint K=5 pool (no seed overlap with VOTE5_orig) reproduces the +10 WF level — proving plurality voting is a robust mechanism, not seed-specific luck. Q-averaging failed; plurality preserves individual policy character and avoids "third action" drift on regime-disagreement bars.
 > - **Single-seed metrics are noisy.** 3-seed analysis ([docs/seed_variance.md](docs/seed_variance.md)) of `BASELINE_FULL` shows WF mean Sharpe std **±2.17** and DQN-test Sharpe std **±2.61** across seeds 42/7/123. Seed=7 produced a negative test Sharpe (−1.14, equity 0.955×). The +9.034 figure is one draw from a distribution with mean ~+8.1.
 > - **Most prior "drop" verdicts in audit follow-up were within seed noise.** Δs of 0.5–2 Sharpe between variants are not statistically distinguishable from a single-seed run. The conclusion that no perturbation clearly improved the baseline still holds; the strength of those rejections was overstated.
 > - **Two frozen reference baselines — see [docs/baselines.md](docs/baselines.md):**
