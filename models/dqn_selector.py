@@ -109,10 +109,14 @@ class _Greedy:
 
 # ── Bellman target + Huber loss ──────────────────────────────────────────────
 
-def bellman_loss(online: DQN, target: DQN, batch: dict, gamma: float,
-                  is_w: torch.Tensor):
+def bellman_loss(online, target, batch: dict, gamma: float,
+                  is_w: torch.Tensor, double: bool = False):
     """target = r + γ^duration · max_a' Q_target(s', a') · (1 - done)
     Loss   = Huber(Q_online(s, a), target) weighted by IS weights.
+
+    If double=True (Double DQN): online net picks argmax action, target net
+    evaluates that action's Q-value. Reduces overestimation bias.
+
     Returns (loss, td_errors_detached_numpy)."""
     s         = torch.from_numpy(batch["state"]).float()
     a         = torch.from_numpy(batch["action"].astype(np.int64))
@@ -125,13 +129,18 @@ def bellman_loss(online: DQN, target: DQN, batch: dict, gamma: float,
     q_sa = online(s).gather(1, a.unsqueeze(1)).squeeze(1)         # (B,)
 
     with torch.no_grad():
-        q_next_max = masked_max(target, s_next, v_next)            # (B,)
+        if double:
+            # Double DQN: online net picks argmax, target net evaluates
+            q_online_next = online(s_next).masked_fill(~v_next, -1e9)
+            a_next        = q_online_next.argmax(dim=1, keepdim=True)
+            q_next_max    = target(s_next).gather(1, a_next).squeeze(1)
+        else:
+            q_next_max = masked_max(target, s_next, v_next)        # (B,)
         bootstrap  = (gamma ** dur.float()) * q_next_max
         bootstrap[done] = 0.0
         tgt        = r + bootstrap
 
     td_err = q_sa - tgt
-    # Huber per-element, weighted by IS
     loss = (is_w * F.huber_loss(q_sa, tgt, reduction="none", delta=HUBER_DELTA)).mean()
     return loss, td_err.detach().cpu().numpy()
 
@@ -234,7 +243,7 @@ def evaluate_policy(net: DQN, state, valid, signals, prices,
 def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
            tag: str = "v1", fee: float = None, trade_penalty: float = 0.0,
            ablate_actions: list = None, state_version: str = "v5",
-           hidden: int = 64):
+           hidden: int = 64, algo: str = "dqn"):
     torch.manual_seed(seed); np.random.seed(seed)
     rng_warm = np.random.default_rng(seed)
     rng_eps  = np.random.default_rng(seed + 1)
@@ -291,9 +300,16 @@ def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
         sp_v["price"], sp_v["atr"], atr_median)
 
     # ── networks + optimizer + buffer ────────────────────────────────────────
-    print(f"  hidden_size={hidden}")
-    online = DQN(state_dim=state_dim, n_actions=10, hidden=hidden)
-    target = DQN(state_dim=state_dim, n_actions=10, hidden=hidden)
+    use_dueling = algo in ("dueling", "double_dueling")
+    use_double  = algo in ("double",  "double_dueling")
+    print(f"  hidden_size={hidden}  algo={algo}  (dueling={use_dueling}, double={use_double})")
+    if use_dueling:
+        from models.dqn_network import DuelingDQN
+        online = DuelingDQN(state_dim=state_dim, n_actions=10, hidden=hidden)
+        target = DuelingDQN(state_dim=state_dim, n_actions=10, hidden=hidden)
+    else:
+        online = DQN(state_dim=state_dim, n_actions=10, hidden=hidden)
+        target = DQN(state_dim=state_dim, n_actions=10, hidden=hidden)
     target.load_state_dict(online.state_dict())
     target.eval()
     optimizer = torch.optim.Adam(online.parameters(), lr=LR)
@@ -356,7 +372,7 @@ def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
         batch, idx, is_w_np = sampler(
             BATCH_SIZE, alpha=PER_ALPHA, beta=per_beta(step))
         is_w = torch.from_numpy(is_w_np)
-        loss, td_errs = bellman_loss(online, target, batch, GAMMA, is_w)
+        loss, td_errs = bellman_loss(online, target, batch, GAMMA, is_w, double=use_double)
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(online.parameters(), GRAD_CLIP)
@@ -461,8 +477,11 @@ if __name__ == "__main__":
                      help="state-array version: v5=50-dim (default), v6=54-dim with direction probs")
     ap.add_argument("--hidden", type=int, default=64,
                      help="DQN hidden layer size (default 64; larger for capacity test)")
+    ap.add_argument("--algo", default="dqn",
+                     choices=["dqn", "double", "dueling", "double_dueling"],
+                     help="RL algorithm: dqn (default), double, dueling, or both")
     args = ap.parse_args()
     ablate = [int(x) for x in args.ablate_actions.split(",") if x.strip()]
     train(args.ticker, seed=args.seed, action_mode=args.mode, tag=args.tag,
            fee=args.fee, trade_penalty=args.trade_penalty, ablate_actions=ablate,
-           state_version=args.state_version, hidden=args.hidden)
+           state_version=args.state_version, hidden=args.hidden, algo=args.algo)
