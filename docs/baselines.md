@@ -1,26 +1,68 @@
 # Baselines — reference systems for all future experiments
 
-> Three frozen reference systems. All future experiments report deltas vs `BASELINE_VOTE5` (strongest) and may include the others for context. Reproducible end-to-end from the data files in `cache/` and the commands below.
+> Refreshed 2026-05-10 after Phase Z1: **`VOTE5_H256_DD` is the new primary baseline.** Reproducible end-to-end from the data files in `cache/` and the commands below. All future experiments report deltas vs `VOTE5_H256_DD` (strongest) and may include the others for context.
 
 ## Quick comparison
 
-| Metric | **VOTE5** | **VOTE5_H128** | **VOTE5_H256** ⭐WF | **VOTE5_DISJOINT** | **FULL** | **LEAN** |
-|---|---|---|---|---|---|---|
-| Type | h=64 plurality vote | h=128 plurality vote | h=256 plurality vote | h=64 plurality vote | Single DQN | Single DQN |
-| Constituents | 5 seeds: 42,7,123,0,99 | same 5 seeds, h=128 | same 5 seeds, h=256 | seeds 1,13,25,50,77 | seed 42 | seed 42 |
-| Net params per seed | 5,674 | 15,434 | 47,242 | 5,674 | 5,674 | 5,674 |
-| **Walk-forward mean Sharpe** | +10.40 | +10.22 | **+11.86** | +10.06 | +9.034 | +6.756 |
-| Walk-forward folds positive | 6/6 | 5/6 | 6/6 | 6/6 | 6/6 | 6/6 |
-| Fold 6 Sharpe (hardest fold) | +5.20 | **+10.70** | +0.41 | +6.11 | +2.33 | +3.09 |
-| DQN-val Sharpe | +3.53 | +0.31 | +3.32 | +3.79 | **+7.295** | +4.662 |
-| DQN-test Sharpe | +4.19 | **+10.59** | +1.21 | +6.45 | +3.666 | +5.192 |
-| Trades (full RL period) | 1,122 | — | — | 1,292 | — | — |
-| Train wall-time | 5 × ~145 s | 5 × ~145 s | 5 × ~145 s | 5 × ~145 s | ~145 s | ~85 s |
-| Profile | balanced default | late-period winner | aggregate winner | best test+f6 | best val | regime alt |
+| Metric | ⭐ **VOTE5_H256_DD** | **VOTE5** | **VOTE5_H256** | **VOTE5_DISJOINT** | **VOTE5_DD** | **FULL** | **LEAN** |
+|---|---|---|---|---|---|---|---|
+| Type | h=256 + Double_Dueling | h=64 plurality | h=256 plurality | h=64 plurality | h=64 + DD plurality | Single DQN | Single DQN |
+| Constituents | 5 seeds: 42,7,123,0,99 | same 5 seeds | same 5 seeds, h=256 | seeds 1,13,25,50,77 | same 5 seeds, DD | seed 42 | seed 42 |
+| Net params per seed | ~96k | 5,674 | 47,242 | 5,674 | ~6k | 5,674 | 5,674 |
+| **Walk-forward mean Sharpe** | **+11.05** | +10.40 | +11.86 | +10.06 | +6.80 | +9.034 | +6.756 |
+| Walk-forward folds positive | **6/6** | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 |
+| Fold 6 Sharpe | **+8.23** | +5.20 | +0.41 | +6.11 | +4.58 | +2.33 | +3.09 |
+| DQN-val Sharpe | +3.21 | +3.53 | +3.32 | +3.79 | **+6.12** | **+7.295** | +4.662 |
+| DQN-test Sharpe | **+9.01** | +4.19 | +1.21 | +6.45 | +5.91 | +3.666 | +5.192 |
+| Trades (full RL period) | 1,372 | 1,122 | — | 1,292 | 1,437 | — | — |
+| Profile | **best test + fold-6** | balanced h=64 | aggregate WF | best test (h=64) | val regularization | best val (single) | regime alt |
 
-**All three beat BTC buy-and-hold on val (+7.2%) and test (+8.6%).**
+**All baselines beat BTC buy-and-hold on val (+7.2%) and test (+8.6%).**
 
-`BASELINE_VOTE5` is the primary deployable system (best WF aggregate, best fold-6, 6/6 folds positive). `BASELINE_FULL` is retained as the strongest single-seed reference (best DQN-val). `BASELINE_LEAN` is retained as a regime-shifted alternative.
+### Headline: VOTE5_H256_DD
+
+`VOTE5_H256_DD` (Phase Z1.1, 2026-05-10) is the **primary deployable system**. It stacks two independently-validated improvements:
+
+- **H256 capacity**: lifts WF mean Sharpe (+11.86 alone vs +10.40 vanilla)
+- **Double_Dueling regularization**: recovers fold-6 robustness (H256 alone fold-6 +0.41 → stacked **+8.23**)
+
+The combination wins on every metric except val Sharpe (where DD-alone retains a small edge):
+
+| | beats vanilla VOTE5 by | beats H256 alone by | beats DD alone by |
+|---|---:|---:|---:|
+| WF | +0.65 | −0.81 | +4.25 |
+| test | **+4.82** | **+7.80** | +3.10 |
+| fold-6 | **+3.03** | **+7.82** | +3.65 |
+
+**Test +9.01 is the highest test Sharpe in the entire project.** Source: [docs/z1_results.md](z1_results.md).
+
+### Reproduction
+
+```bash
+for SEED in 42 7 123 0 99; do
+  python3 -m models.dqn_selector btc \
+    --tag VOTE5_H256_DD_seed${SEED} \
+    --hidden 256 --algo double_dueling \
+    --fee 0.0 --trade-penalty 0.001 --seed ${SEED}
+done
+# Then evaluate as K=5 plurality:
+python3 -m models.eval_z1_full
+```
+
+Wall time: 5 × ~2 min training. Network: `DuelingDQN(50, 10, hidden=256)` with Double DQN target update.
+
+### ~~Dropped: BASELINE_VOTE5_H128~~
+
+Previously listed as the "late-period winner". **Exposed as seed-luck in Phase Z1.4**: the original pool's fold-6 +10.70 / test +10.59 collapse to **fold-6 −4.82** / test +5.30 in a disjoint seed pool. Mean across both pools: WF +8.55, fold-6 +2.94. Removed from baseline rotation. See [docs/z1_results.md](z1_results.md) §Z1.4.
+
+### Other baselines retained
+
+- `BASELINE_VOTE5` (h=64 plurality, vanilla DQN): historical primary; still useful as a lightweight reference for state-vector / strategy-space experiments.
+- `BASELINE_VOTE5_H256` (h=256 plurality, vanilla): high WF aggregate but weak fold-6; kept for capacity-axis comparisons.
+- `BASELINE_VOTE5_DISJOINT` (h=64 plurality, seeds 1/13/25/50/77): structural validation of plurality voting.
+- `BASELINE_VOTE5_DD` (h=64 plurality, DD): regularization-axis reference; best val of any K=5 (+6.12).
+- `BASELINE_FULL` (single seed=42): strongest single-seed val (+7.30); not deployable solo (variance ±2.17).
+- `BASELINE_LEAN` (single seed=42, S6/S7/S8 ablated): regime-alternative.
 
 `BASELINE_VOTE5` is documented separately in [voting_ensemble.md](voting_ensemble.md). The remainder of this doc covers `BASELINE_FULL` and `BASELINE_LEAN` (both single-seed) — `BASELINE_VOTE5` shares the same training spec but uses 5 seeds aggregated by plurality voting.
 
