@@ -1,5 +1,8 @@
 # Crypto Trading ML — Results & Conclusions
 
+> **Status (2026-05-10, post development-plan formalization):**
+> - **Forward plan formalized — ORG** ([docs/development_plan.md](docs/development_plan.md)). Master plan with Path Z (zero-fee, ACTIVE) and Path F (non-zero-fee, PARKED). Path Z phases: Z1 stack proven winners (H256+DD, K=10), Z2 better state (cross-asset, perp basis, OB depth), Z3 new strategies (S13–S16), Z4 architecture (self-distillation, transformer, distributional RL), Z5 validation+freeze. Each phase has decision gates. Supersedes the older `docs/next_steps.md`.
+>
 > **Status (2026-05-10, post fee-sensitivity & fee-aware retrain):**
 > - **Fee sensitivity & VOTE5_DD audit — DIAGNOSTIC** ([docs/vote5_dd_audit.md](docs/vote5_dd_audit.md), [docs/fee_sensitivity_vote5.md](docs/fee_sensitivity_vote5.md)). Both `BASELINE_VOTE5` and `BASELINE_VOTE5_DD` collapse under realistic OKX taker fee (4.5 bp/side). Vanilla VOTE5: WF +10.40 → **+1.10** at 4.5 bp; DD: +6.80 → +0.75. Mean per-trade alpha ~0.20% vs round-trip cost 0.09%. Breakeven fee ≈3 bp (DD) / 5 bp (vanilla). Both die well below taker; **maker-only execution is the only path that breaks the fee ceiling**.
 > - **Vanilla beats DD at every fee level + filter combo wins** ([docs/fee_sensitivity_vote5.md](docs/fee_sensitivity_vote5.md)). Trade-reduction filtering at fee=4.5 bp: best config is **vanilla VOTE5 + top-5 strategies (drop S2, S3, S6, S12) + vote ≥ 3** → WF **+3.72**, test **+0.97**, 4/6 folds. The audit-derived ablation (drop S6, S10) finally pays off here: test **+3.98** at 4.5 bp. Val remains hostile under any filter — that period has structurally weaker per-trade alpha.
