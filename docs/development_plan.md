@@ -19,6 +19,23 @@ This is the live forward plan as of 2026-05-10. Supersedes [next_steps.md](next_
 
 ---
 
+## Execution status
+
+| phase | status | notes |
+|---|---|---|
+| Z1 — Stack proven winners | NOT STARTED | first to run; ~2 days |
+| Z2 — Better state | NOT STARTED | depends on Z1 winner as baseline |
+| Z3 — Better signals | **PARTIALLY SCOPED** | Z3 plan revised after [feasibility check](z3_data_feasibility.md); compressed from 4 strategies to 2 work items |
+| Z4 — Architecture & training | NOT STARTED | each sub-experiment independent of others |
+| Z5 — Validation & freeze | gated on Z1–Z4 winners | |
+| Path F (non-zero-fee) | PARKED | resume after Path Z winner OR if maker-only fails |
+
+**Suggested first action**: launch Z1.1 (H256 + Double_Dueling stack, 5 seeds, ~2.5 h) — cheapest test combining two independently-validated improvements (capacity from H256 + regularization from DD).
+
+**Parallel cheap action**: Z3.1 standalone validation of S5/S9/S11/S13 — no training required, just backtest the 4 unused strategies to see which carry signal. Could run while Z1.1 trains.
+
+---
+
 # Path Z — Zero-fee algorithm improvement (ACTIVE)
 
 Goal: lift WF mean Sharpe meaningfully above +10.40 (vanilla VOTE5) or +11.86 (H256), while preserving 6/6 fold positivity and improving fold-6 robustness.
@@ -55,16 +72,24 @@ The state vector is currently 50 dims, BTC-only, no perp basis. Multiple signals
 
 ## Phase Z3 — Better signals (medium-risk)
 
-The 9 strategies in `strategy/agent.py` are fixed. Adding new strategies expands the action space.
+> **Plan compressed 2026-05-10 after data feasibility check.** [docs/z3_data_feasibility.md](z3_data_feasibility.md) revealed that `strategy/agent.py` already defines **13** strategies but only 9 are wired into the DQN action space. The 4 unused strategies (S5, S9, S11, S13) overlap with the originally-proposed S14+S16. S2_Funding (already wired in) covers my originally-proposed S13_FundingExtreme. Net result: the original 4-strategy plan compresses to **2 work items**. Original proposal preserved below as historical context.
 
-| ID | Strategy idea | Why | Cost |
+| ID | Action | Cost | Why |
 |---|---|---|---|
-| Z3.1 | **S13_FundingExtreme**: trade against extreme positive/negative funding (mean-reversion on funding) | Funding-rate mean-reversion is a documented edge; we have `fund_rate` in features | ~1 day |
-| Z3.2 | **S14_DepthImbalance**: trade direction of large OB depth imbalance + microprice | Direct OB-driven; complements current taker-flow signal | ~1 day |
-| Z3.3 | **S15_VolBreakout**: enter on volatility expansion above N-bar median ATR | Currently no pure-vol-expansion strategy; ATR-scaled exits already in place | ~0.5 day |
-| Z3.4 | **S16_BasisDislocation**: spot-perp basis trade | If Z2.2 included basis in state, this is the natural action counterpart | ~1 day |
+| **Z3.1** | Wire existing-but-unused `S5_OFISpike`, `S9_LargeImbalance`, `S11_BasisMomentum`, `S13_OBDisagreement` into `STRAT_KEYS`. Standalone-validate each via [backtest/run.py](../backtest/run.py); drop weak ones, retrain `VOTE5_v8` with expanded action space (10 → up to 14). | ~1 day | Code already exists; tests existing-but-untried alpha at the cost of just validation + retrain. Cheapest signal expansion. |
+| **Z3.2** | Implement genuinely-new `S15_VolBreakout` as `strategy_14` (`vol_ratio = ATR_30 / median(ATR_60) > 2.0` + 10-bar direction filter). | ~0.5 day | No equivalent in current 13. Calibrated threshold from feasibility check (1.5 → 2.0; 25% → 6% fire rate). |
+| ~~Z3.3~~ | ~~Original S13_FundingExtreme~~ | — | Subsumed by existing `S2_Funding` (filtered variant) + dataset's funding range too narrow for unfiltered version. |
+| ~~Z3.4~~ | ~~Custom S14_DepthImbalance, S16_BasisDislocation~~ | — | Subsumed by existing `S9_LargeImbalance`, `S11_BasisMomentum` once wired in. |
 
-**Decision gate**: each new strategy goes through the existing [data_splits](data_splits.md) eval. Keep if win-rate > 50% on val AND mean PnL > strategy median. Then retrain VOTE5 with expanded action space (10 → 13 actions).
+**Decision gate (Z3.1)**: each rewired strategy must achieve win-rate > 50% on DQN-val AND mean PnL/trade > 0.15% via standalone backtest. Drop weak ones before retraining VOTE5_v8.
+
+**Decision gate (Z3.2)**: same standalone-validation criteria as Z3.1.
+
+**Final retrain decision**: keep `VOTE5_v8` if WF mean Sharpe ≥ +10.40 (current `BASELINE_VOTE5`) with no fold worse than current by >0.5.
+
+### Original Z3 proposal (historical reference, before feasibility check)
+
+The original proposal added 4 new strategies (S13–S16). It's preserved below for context. Most of the conceptual work translates: the *same alpha-discovery surface* is covered by Z3.1 (existing code) + Z3.2 (one truly new strategy).
 
 ### Z3 detailed sub-plan
 
