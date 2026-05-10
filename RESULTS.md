@@ -1,5 +1,10 @@
 # Crypto Trading ML — Results & Conclusions
 
+> **Status (2026-05-10, post Phase Z1 — stack proven winners):**
+> - **Phase Z1 complete — `VOTE5_H256_DD` PROMOTED** ([docs/z1_results.md](docs/z1_results.md)). The H256+DD architectural stack (capacity + regularization) achieves **WF +11.05, test +9.01 (highest in project history), val +3.21, fold-6 +8.23, 6/6 folds positive.** Hypothesis confirmed: capacity (H256) preserves WF lift while DD's regularization recovers fold-6 from H256-alone's collapse to +0.41. Test +9.01 beats every prior baseline by wide margin. New candidate baseline pending Z5 validation.
+> - **Z1.2 K=10 vanilla — NEGATIVE** ([docs/z1_results.md](docs/z1_results.md)). VOTE10 plurality has more ways to tie than K=5 → trade count drops 1,122 → 965 (−14%) → Sharpe ∝ √N collapse. WF +9.65 (vs K=5 +10.40), val −0.53. Don't use K=10. K=5 is sweet spot.
+> - **Z1.4 H128 EXPOSED AS SEED-LUCK** ([docs/z1_results.md](docs/z1_results.md)). Original `BASELINE_VOTE5_H128` had fold-6 +10.70 / test +10.59. Disjoint pool reproduces with fold-6 **−4.82** / test +5.30. The advertised H128 win was a single-seed-pool fluke — **drop `BASELINE_VOTE5_H128` from baseline rotation.** H256 reproduces (mean of orig+disjoint: WF +10.86, fold-6 +3.58). DD ensemble's val/WF magnitude is seed-sensitive but 6/6 folds preserved structurally.
+>
 > **Status (2026-05-10, post development-plan formalization):**
 > - **Forward plan formalized — ORG** ([docs/development_plan.md](docs/development_plan.md)). Master plan with Path Z (zero-fee, ACTIVE) and Path F (non-zero-fee, PARKED). Path Z phases: Z1 stack proven winners (H256+DD, K=10), Z2 better state (cross-asset, perp basis, OB depth), Z3 new strategies (S13–S16), Z4 architecture (self-distillation, transformer, distributional RL), Z5 validation+freeze. Each phase has decision gates. Supersedes the older `docs/next_steps.md`.
 >

@@ -23,16 +23,26 @@ This is the live forward plan as of 2026-05-10. Supersedes [next_steps.md](next_
 
 | phase | status | notes |
 |---|---|---|
-| Z1 — Stack proven winners | NOT STARTED | first to run; ~2 days |
-| Z2 — Better state | NOT STARTED | depends on Z1 winner as baseline |
-| Z3 — Better signals | **PARTIALLY SCOPED** | Z3 plan revised after [feasibility check](z3_data_feasibility.md); compressed from 4 strategies to 2 work items |
-| Z4 — Architecture & training | NOT STARTED | each sub-experiment independent of others |
+| **Z1 — Stack proven winners** | ✅ **DONE 2026-05-10** | Winner: **`VOTE5_H256_DD`** (WF +11.05, test +9.01, fold-6 +8.23, 6/6 folds). See [z1_results.md](z1_results.md). |
+| Z2 — Better state | NEXT — baseline now `VOTE5_H256_DD` | depends on Z1 winner |
+| Z3 — Better signals | PARTIALLY SCOPED | Z3 plan revised after [feasibility check](z3_data_feasibility.md) |
+| Z4 — Architecture & training | NOT STARTED | each sub-experiment independent |
 | Z5 — Validation & freeze | gated on Z1–Z4 winners | |
 | Path F (non-zero-fee) | PARKED | resume after Path Z winner OR if maker-only fails |
 
-**Suggested first action**: launch Z1.1 (H256 + Double_Dueling stack, 5 seeds, ~2.5 h) — cheapest test combining two independently-validated improvements (capacity from H256 + regularization from DD).
+### Z1 outcomes
+- ✅ **Z1.1 H256+DD** — WIN. Promoted as new candidate baseline.
+- ❌ **Z1.2 K=10 vanilla** — NEGATIVE. Tie-driven NO_TRADE inflation; WF drops vs K=5.
+- 🔍 **Z1.3 DD disjoint** — DIAGNOSTIC. DD val/WF magnitude is seed-sensitive; 6/6 folds robust.
+- 🔍 **Z1.4 H128/H256 disjoint** — H128 EXPOSED as seed-luck (drop). H256 reproduces.
 
-**Parallel cheap action**: Z3.1 standalone validation of S5/S9/S11/S13 — no training required, just backtest the 4 unused strategies to see which carry signal. Could run while Z1.1 trains.
+### Suggested next actions
+
+Two cheap parallel paths:
+1. **Z2.4** (price action context, 4 dims) — cheapest Z2 sub, ~30 min training, low-risk warm-up
+2. **Z3.1 standalone validation** of S5/S9/S11/S13 — no training, just backtest. Can run in parallel.
+
+Then if either lifts, retrain `VOTE5_H256_DD` with the new state/strategies and call it `VOTE5_v8_H256_DD`.
 
 ---
 
