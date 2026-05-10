@@ -20,62 +20,134 @@ This is the live forward plan as of 2026-05-10. Supersedes [next_steps.md](next_
 
 ---
 
-## ⏭ Current steps — what to do next
+## ⏭ Current steps — what to do next, and why
 
-**Phase Z1 just completed.** Baseline is now `VOTE5_H256_DD` (WF +11.05). Active phase: **Z2 (better state)**.
+### The starting point
 
-### Step 1 — Z3.1 standalone validation (no training, ~1 hour)
+Phase Z1 produced `VOTE5_H256_DD` at **WF +11.05 / test +9.01 / fold-6 +8.23 / 6/6 folds**. The H256 capacity + DD regularization stack worked exactly as hypothesized — capacity gave the WF lift, regularization recovered fold-6.
 
-Run [backtest/run.py](../backtest/run.py) on each of the 4 unused-but-coded strategies (`strategy_5`, `strategy_9`, `strategy_11`, `strategy_13` from [strategy/agent.py](../strategy/agent.py)) over the full RL period.
+### The question we're answering next
 
-For each: record win-rate, mean PnL/trade, total trades, val Sharpe. Drop strategies that fail the gate (win-rate ≤50% or mean PnL ≤0.15%). Keep the rest for Step 4 retraining.
+**Where is the next +1 to +2 Sharpe coming from?** There are exactly three places it could be:
 
-**Why first**: zero training cost, parallel-able with Step 2. Result determines whether Z3.1 retrain (Step 4) is worthwhile at all.
+1. **More information** (Phase Z2) — the policy is making decisions on a state vector that's missing useful context.
+2. **More actions** (Phase Z3) — the action space (9 strategies) doesn't include trades the policy would take if it could.
+3. **Better learning** (Phase Z4) — the policy isn't extracting all the signal that's already in state + actions.
 
-### Step 2 — Z2.4 price-action context (cheapest Z2, ~25 min training)
+Each axis has different evidence. The order of next steps follows the strength of evidence.
 
-Add 4 features to state vector: `price_max_60/now`, `now/price_min_60`, `realized_vol_60`, `vol_ratio_30_60`. Regenerate state cache (call it `v7_pa`). Train 5 H256+DD seeds with the new state and evaluate as K=5 plurality.
+### Evidence per axis — what we already know
 
-**Why first**: cheapest Z2 sub-experiment with bounded downside. Establishes the Z2 retrain pattern. If it lifts WF by ≥+0.5, run Z2.2 next; if null, proceed to Z2.2 anyway since it's the most promising candidate.
+**Z2 — More state information**: weak evidence base.
+- State v6 added direction probabilities (4 dims) → NEGATIVE result, WF dropped by 1.78 ([state_v6_test.md](state_v6_test.md)). But those 4 dims were already implicit in the binary signal flags — that's a *weak* negative, not a *general* one.
+- We have features that exist in `cache/*_meta.parquet` but are NOT in the 50-dim state: cross-asset (ETH/SOL), perp-spot basis as raw, funding-rate dynamics, OB-depth percentiles. **These have never been tested.**
+- *Inference*: the bottleneck might be in *which* information is in state, not in *how much*. Worth testing.
 
-### Step 3 — Z2.2 perp basis + funding state (~3-4 h)
+**Z3 — More actions**: stronger evidence base.
+- [strategy/agent.py](../strategy/agent.py) defines **13 strategies**, but only **9** are wired into the DQN action space. Strategies 5, 9, 11, 13 exist as code but the DQN has never seen them.
+- Strategy 11 specifically uses spot-perp basis (`diff_price` z-score) — a signal type completely absent from the current 9 strategies.
+- The A4 audit ([baseline_vote5_audit.md](baseline_vote5_audit.md)) showed S6 and S10 contributing *negatively* on test — the current action space is not optimally chosen, suggesting unused-code strategies could displace the weak ones.
+- *Inference*: there is likely free alpha in the unused code. The cost to test is **zero training** — a standalone backtest confirms or rejects.
 
-The most promising Z2 candidate per the plan's prior judgment. Add 5 features: `basis_z_60`, `basis_change_1bar`, `funding_rate_apr`, `funding_z_120`, `oi_change_60`. State `v7_basis`. Retrain 5 seeds, eval.
+**Z4 — Better learning**: positive evidence base, but expensive to test.
+- We *just* showed in Z1 that architecture changes work (+0.65 WF from H256+DD stack). This is direct evidence that the architecture axis has more headroom.
+- But Z4's experiments (transformer, distributional RL, self-distillation) are 1-2 days each — by far the most expensive axis to explore.
+- *Inference*: there's likely value here, but cost-benefit favors exhausting Z2/Z3 first.
 
-**Why second**: if Step 2 confirmed the retrain pipeline works, Step 3 tests the hypothesized strongest macro-context add. If both Step 2 and Step 3 lift, combine in Step 5 (Z2.5).
+### The strategy: cheap-first, evidence-driven, gated
 
-### Step 4 — Z3.1 wire & retrain (~1 day, gated on Step 1)
+The right order is **Z3 standalone validation → Z2 cheap warm-up → Z2 strong candidate → Z3 retrain → Z2 combined → Z3 novel strategy**. Reasoning:
 
-If ≥2 strategies survived Step 1's standalone validation:
-1. Add their keys to `STRAT_KEYS` in [models/dqn_rollout.py](../models/dqn_rollout.py) (10 → 11/12/13/14 actions).
-2. Add execution config in [execution/](../execution/) per strategy.
-3. Regenerate `cache/btc_dqn_state_*.npz` with expanded `signals` shape.
-4. Train 5 H256+DD seeds with expanded action space → `VOTE5_v8_H256_DD`.
-5. Evaluate vs `VOTE5_H256_DD` baseline.
+1. **Cheapest action with the highest information value first** — Z3.1 standalone validation costs ~1 hour and tells us whether 4 unused strategies have signal. The result reshapes the entire plan: if 2+ strategies pass, Step 4 becomes high-priority; if all fail, we skip Step 4 and Step 6 entirely.
 
-**Why fourth**: depends on Step 1's verdict. Could be skipped entirely if Step 1 finds all 4 unused strategies are noise.
+2. **Establish the retrain pipeline cheaply** — Z2.4 (price-action, 4 dims) is ~25 min training. Whether or not it lifts Sharpe, it proves the v7 retrain pipeline works, which de-risks the more expensive Z2.2.
 
-### Step 5 — Z2.5 combined state v7 (~1 h, gated on Steps 2+3)
+3. **Hit the strongest theoretical add** — Z2.2 (basis + funding state) is the most promising Z2 candidate because basis & funding are documented macro signals that are completely absent from current state, AND we know strategies that *use* them (S2_Funding, the unused S11) exist or could exist. Adding the *state context* alongside *strategy actions* in parallel is multiplicative.
 
-Stack survivors of Z2.x into one state vector, retrain 5 seeds, eval.
+4. **Compose surviving wins** — Z2.5 (combined state v7) only runs if Steps 2+3 produced winners. If yes, this tests additivity. If no, skipped.
 
-### Step 6 — Z3.2 S15_VolBreakout (~0.5 day, gated on Step 4 retrain pipeline)
+5. **Add genuine novelty last** — Z3.2 (S15_VolBreakout) is the only truly-new strategy in the plan. It runs after Step 4 confirms the action-space-expansion pipeline works.
 
-Implement `strategy_14` (vol-ratio > 2.0 + 10-bar direction). Standalone-validate first; if pass, retrain `VOTE5_v8` with action 15 added.
+### The 6 steps
 
-### What we are NOT doing yet
+| # | step | cost | gate | result reshapes |
+|---|---|---|---|---|
+| **1** | [Z3.1 standalone validation](#step-1) | ~1 h, **0 training** | none | Steps 4, 6 |
+| **2** | [Z2.4 price-action context](#step-2) | ~25 min train | none | Step 5 |
+| **3** | [Z2.2 perp basis + funding state](#step-3) | ~3-4 h | Step 2 pipeline works | Step 5 |
+| **4** | [Z3.1 wire & retrain](#step-4) | ~1 day | ≥2 strategies pass Step 1 | Step 6 |
+| **5** | [Z2.5 combined state v7](#step-5) | ~1 h | Steps 2+3 winners exist | — |
+| **6** | [Z3.2 S15_VolBreakout](#step-6) | ~0.5 day | Step 4 pipeline works | — |
 
-- **Z4 (architecture)** — not started; all sub-experiments are higher-cost research bets. Wait until Z2/Z3 are exhausted.
-- **Z5 (validation+freeze)** — gated; only runs once Z2/Z3/Z4 produce a clear winner.
-- **Path F (non-zero-fee)** — parked.
-- **Path X (maker-only scoping)** — engineering, not in this plan's scope.
+#### Step 1 — Z3.1 standalone validation
+**What**: Run [backtest/run.py](../backtest/run.py) on each of `strategy_5`, `strategy_9`, `strategy_11`, `strategy_13` over the full RL period (rule-based exits, fee=0).
+**Output per strategy**: win-rate, mean PnL/trade, total trades, val/test/WF Sharpe.
+**Decision**: keep strategies with win-rate >50% AND mean PnL >0.15% (median across current 9). Drop the rest.
+**Proof of value**: 4 strategies exist as production-ready code that has never been evaluated as part of the DQN action space. The maximum information-per-hour ratio in this entire plan. Even if all 4 fail (a real possibility), the negative result reshapes the plan by removing Steps 4 and 6.
 
-### Decision rules (per-step)
+#### Step 2 — Z2.4 price-action context
+**What**: Add 4 features to state vector: `price_max_60/now`, `now/price_min_60`, `realized_vol_60`, `vol_ratio_30_60`. Regenerate state cache as `v7_pa`. Retrain 5 H256+DD seeds. Eval as K=5 plurality.
+**Decision**: keep if WF ≥ +11.55 (current +0.5) AND no fold worse by >0.5.
+**Proof of value**: state currently has regime-id but no continuous "how-extreme-is-this-bar" features. Recent-extreme distance and realized vol are the simplest possible additions; if they don't help, more sophisticated features (basis, cross-asset) probably won't either. **This is also a pipeline test** — establishes that v7 state retrain works before we invest 4 hours into Z2.2.
 
-After each step's eval result:
-- **WF lift ≥+0.5** vs current baseline AND **no fold worse by >0.5** → keep the change, propagate as new baseline.
-- **WF flat or down** → drop, document the negative result, move on.
-- **Per [.claude/rules/experiments.md](../.claude/rules/experiments.md)**: every step produces a `docs/{step_name}.md`, registers any new model in `model_registry.json`, and updates `RESULTS.md` status block in the same commit.
+#### Step 3 — Z2.2 perp basis + funding state
+**What**: Add 5 features: `basis_z_60`, `basis_change_1bar`, `funding_rate_apr`, `funding_z_120`, `oi_change_60`. State `v7_basis`. Retrain, eval.
+**Decision**: keep if WF ≥ +11.55 AND val ≥ +3.0 (basis features should specifically help OOD val resilience).
+**Proof of value**:
+- **None of these features are in current state** despite being in [meta parquet](../cache/okx_btcusdt_spotpepr_20260425_meta.parquet).
+- Basis and funding are leading indicators for leverage-driven moves (squeezes, liquidations). Their *absence* from state is a known gap.
+- The fee-aware retrain experiment ([fee_aware_retrain.md](fee_aware_retrain.md)) showed adding fee to reward but NOT state was suboptimal — a clue that important context belongs in state, not just in reward.
+- This is **the most theoretically-grounded Z2 candidate.**
+
+#### Step 4 — Z3.1 wire & retrain
+**What**: If ≥2 strategies pass Step 1, add their keys to `STRAT_KEYS`, add execution configs, regenerate state cache with expanded `signals` shape, train 5 H256+DD seeds at action space 11–14 → `VOTE5_v8_H256_DD`.
+**Decision**: keep if WF ≥ +11.55.
+**Proof of value**: gated on positive Step 1. If Step 1 finds signal, Step 4 is the deployment vehicle. The expanded action space gives the DQN more options to choose from on bars where the current 9 don't fire — direct trade-volume expansion (Sharpe ∝ √N).
+
+#### Step 5 — Z2.5 combined state v7
+**What**: stack survivors of Steps 2+3 into one expanded state. Retrain 5 seeds. Eval.
+**Decision**: keep if WF ≥ max(Step 2, Step 3) + 0.3.
+**Proof of value**: tests *additivity*. If price-action and basis features each lift independently, the question is whether they overlap (no additivity) or cover different decision contexts (additive). Cheap test gives a definitive answer.
+
+#### Step 6 — Z3.2 S15_VolBreakout
+**What**: Implement `strategy_14` with vol-ratio > 2.0 + 10-bar direction filter. Standalone-validate; if pass, expand action space again (12-15 actions including Step 4 survivors).
+**Decision**: keep if standalone passes AND retrained ensemble ≥ +11.55.
+**Proof of value**: this is the only truly-new strategy in the plan (no equivalent in existing 13). [Z3 feasibility check](z3_data_feasibility.md) showed `vol_ratio > 2.0` fires on ~6% of bars — non-trivial frequency, decent fire rate for a momentum continuation signal. None of S1-S13 fire on pure vol expansion.
+
+### What we are NOT doing yet, and why
+
+- **Z4 (architecture experiments — transformer, distributional RL, self-distillation)** — not started. Each is 1-2 days of new code. Cost-benefit favors exhausting cheaper Z2/Z3 first. We have evidence (Z1 results) that this axis has headroom; we'll come back to it.
+- **Z5 (validation + freeze)** — gated; only runs once Z2/Z3/Z4 produce a winner clear enough to ship.
+- **Path F (non-zero-fee)** — parked per user direction. The 7-item plan in [fee_improvement_proposals.md](fee_improvement_proposals.md) resumes when zero-fee path saturates OR if maker-only execution (Path X) proves infeasible.
+- **Path X (maker-only execution scoping)** — engineering, separate track, not in this research plan.
+
+### Decision rules (every step)
+
+- **Pass criterion**: WF mean Sharpe lift ≥ +0.5 AND no fold worse than current baseline by >0.5.
+- **Per-step deliverables (rule-enforced, see [.claude/rules/experiments.md](../.claude/rules/experiments.md))**:
+  - `docs/{step_name}.md` with method, metrics, verdict
+  - Every trained model registered in `model_registry.json`
+  - `RESULTS.md` status block updated
+  - All in **one commit** per step
+
+### What this plan accomplishes if everything passes
+
+If Steps 1-6 all clear their gates, the final ensemble at the end of Phase Z2/Z3 would be:
+- Architecture: H256 + Double_Dueling (Z1)
+- State: v7 with price-action + basis/funding features (Steps 2, 3, 5)
+- Action space: 11-15 actions (Steps 4, 6 added 2-5 strategies to the original 9)
+- Expected: WF ≥ +12.5, fold-6 ≥ +9, test ≥ +10, 6/6 folds positive
+
+This becomes the input to Phase Z5 (validation + freeze) and is the candidate for production deployment.
+
+### What this plan accomplishes if NOTHING passes
+
+The combined cost is ~7 days of work. If every step fails, we still own:
+- Hard evidence that the current baseline is at a local optimum on the (state, action, architecture) surface we've explored
+- A clear case for jumping to Phase Z4 (architectural research bets)
+- Or for accepting the current `VOTE5_H256_DD` as production-ready and moving to Path X (maker-only deployment)
+
+**A negative outcome on Z2/Z3 is not a wasted investment** — it's the signal that the bottleneck has shifted to architecture or deployment.
 
 ---
 
