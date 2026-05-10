@@ -4,18 +4,78 @@ This is the live forward plan as of 2026-05-10. Supersedes [next_steps.md](next_
 
 ## Current state — the bars to beat
 
-### Zero-fee headline
-| baseline | WF | val | test | folds + |
-|---|---:|---:|---:|:--:|
-| **`BASELINE_VOTE5`** ⭐ | **+10.40** | +3.53 | +4.19 | 6/6 |
-| `BASELINE_VOTE5_H256` | +11.86 | +3.32 | +1.21 | 6/6 (fold-6 +0.41) |
-| `BASELINE_VOTE5_H128` | +10.22 | +0.31 | **+10.59** | 5/6 (fold-6 +10.70) |
+### Zero-fee headline (post-Z1)
+| baseline | WF | val | test | fold-6 | folds + |
+|---|---:|---:|---:|---:|:--:|
+| **`VOTE5_H256_DD`** ⭐ (Z1.1 winner) | **+11.05** | +3.21 | **+9.01** | **+8.23** | 6/6 |
+| `BASELINE_VOTE5` (h=64 vanilla) | +10.40 | +3.53 | +4.19 | +5.20 | 6/6 |
 
 ### Non-zero-fee headline (4.5 bp/side OKX taker)
 | config | WF | val | test | folds + |
 |---|---:|---:|---:|:--:|
 | **vanilla VOTE5 + top-5 + vote≥3** ⭐ | **+3.72** | −8.11 | +0.97 | 4/6 |
 | FEE4_p005 + vote≥3 | +2.57 | −4.82 | −4.07 | 5/6 |
+
+> Note: the fee=4.5 bp leaderboard above has **not been re-evaluated against `VOTE5_H256_DD`** yet. That's part of Z5.3 (fee-curve check) — a future step.
+
+---
+
+## ⏭ Current steps — what to do next
+
+**Phase Z1 just completed.** Baseline is now `VOTE5_H256_DD` (WF +11.05). Active phase: **Z2 (better state)**.
+
+### Step 1 — Z3.1 standalone validation (no training, ~1 hour)
+
+Run [backtest/run.py](../backtest/run.py) on each of the 4 unused-but-coded strategies (`strategy_5`, `strategy_9`, `strategy_11`, `strategy_13` from [strategy/agent.py](../strategy/agent.py)) over the full RL period.
+
+For each: record win-rate, mean PnL/trade, total trades, val Sharpe. Drop strategies that fail the gate (win-rate ≤50% or mean PnL ≤0.15%). Keep the rest for Step 4 retraining.
+
+**Why first**: zero training cost, parallel-able with Step 2. Result determines whether Z3.1 retrain (Step 4) is worthwhile at all.
+
+### Step 2 — Z2.4 price-action context (cheapest Z2, ~25 min training)
+
+Add 4 features to state vector: `price_max_60/now`, `now/price_min_60`, `realized_vol_60`, `vol_ratio_30_60`. Regenerate state cache (call it `v7_pa`). Train 5 H256+DD seeds with the new state and evaluate as K=5 plurality.
+
+**Why first**: cheapest Z2 sub-experiment with bounded downside. Establishes the Z2 retrain pattern. If it lifts WF by ≥+0.5, run Z2.2 next; if null, proceed to Z2.2 anyway since it's the most promising candidate.
+
+### Step 3 — Z2.2 perp basis + funding state (~3-4 h)
+
+The most promising Z2 candidate per the plan's prior judgment. Add 5 features: `basis_z_60`, `basis_change_1bar`, `funding_rate_apr`, `funding_z_120`, `oi_change_60`. State `v7_basis`. Retrain 5 seeds, eval.
+
+**Why second**: if Step 2 confirmed the retrain pipeline works, Step 3 tests the hypothesized strongest macro-context add. If both Step 2 and Step 3 lift, combine in Step 5 (Z2.5).
+
+### Step 4 — Z3.1 wire & retrain (~1 day, gated on Step 1)
+
+If ≥2 strategies survived Step 1's standalone validation:
+1. Add their keys to `STRAT_KEYS` in [models/dqn_rollout.py](../models/dqn_rollout.py) (10 → 11/12/13/14 actions).
+2. Add execution config in [execution/](../execution/) per strategy.
+3. Regenerate `cache/btc_dqn_state_*.npz` with expanded `signals` shape.
+4. Train 5 H256+DD seeds with expanded action space → `VOTE5_v8_H256_DD`.
+5. Evaluate vs `VOTE5_H256_DD` baseline.
+
+**Why fourth**: depends on Step 1's verdict. Could be skipped entirely if Step 1 finds all 4 unused strategies are noise.
+
+### Step 5 — Z2.5 combined state v7 (~1 h, gated on Steps 2+3)
+
+Stack survivors of Z2.x into one state vector, retrain 5 seeds, eval.
+
+### Step 6 — Z3.2 S15_VolBreakout (~0.5 day, gated on Step 4 retrain pipeline)
+
+Implement `strategy_14` (vol-ratio > 2.0 + 10-bar direction). Standalone-validate first; if pass, retrain `VOTE5_v8` with action 15 added.
+
+### What we are NOT doing yet
+
+- **Z4 (architecture)** — not started; all sub-experiments are higher-cost research bets. Wait until Z2/Z3 are exhausted.
+- **Z5 (validation+freeze)** — gated; only runs once Z2/Z3/Z4 produce a clear winner.
+- **Path F (non-zero-fee)** — parked.
+- **Path X (maker-only scoping)** — engineering, not in this plan's scope.
+
+### Decision rules (per-step)
+
+After each step's eval result:
+- **WF lift ≥+0.5** vs current baseline AND **no fold worse by >0.5** → keep the change, propagate as new baseline.
+- **WF flat or down** → drop, document the negative result, move on.
+- **Per [.claude/rules/experiments.md](../.claude/rules/experiments.md)**: every step produces a `docs/{step_name}.md`, registers any new model in `model_registry.json`, and updates `RESULTS.md` status block in the same commit.
 
 ---
 
@@ -24,25 +84,17 @@ This is the live forward plan as of 2026-05-10. Supersedes [next_steps.md](next_
 | phase | status | notes |
 |---|---|---|
 | **Z1 — Stack proven winners** | ✅ **DONE 2026-05-10** | Winner: **`VOTE5_H256_DD`** (WF +11.05, test +9.01, fold-6 +8.23, 6/6 folds). See [z1_results.md](z1_results.md). |
-| Z2 — Better state | NEXT — baseline now `VOTE5_H256_DD` | depends on Z1 winner |
-| Z3 — Better signals | PARTIALLY SCOPED | Z3 plan revised after [feasibility check](z3_data_feasibility.md) |
-| Z4 — Architecture & training | NOT STARTED | each sub-experiment independent |
-| Z5 — Validation & freeze | gated on Z1–Z4 winners | |
-| Path F (non-zero-fee) | PARKED | resume after Path Z winner OR if maker-only fails |
+| **Z2 — Better state** | 🔵 **NEXT** | Steps 2, 3, 5 above. Baseline: `VOTE5_H256_DD`. |
+| **Z3 — Better signals** | 🟡 PRE-SCOPED | Steps 1 (validation) + 4 (retrain) + 6 (S15). [feasibility check](z3_data_feasibility.md) compressed plan. |
+| Z4 — Architecture & training | ⚪ NOT STARTED | gated; defer until Z2/Z3 exhausted |
+| Z5 — Validation & freeze | ⚪ NOT STARTED | gated on Z1–Z4 winner |
+| Path F (non-zero-fee) | ⚫ PARKED | resume after Path Z winner OR if maker-only fails |
 
 ### Z1 outcomes
 - ✅ **Z1.1 H256+DD** — WIN. Promoted as new candidate baseline.
 - ❌ **Z1.2 K=10 vanilla** — NEGATIVE. Tie-driven NO_TRADE inflation; WF drops vs K=5.
 - 🔍 **Z1.3 DD disjoint** — DIAGNOSTIC. DD val/WF magnitude is seed-sensitive; 6/6 folds robust.
 - 🔍 **Z1.4 H128/H256 disjoint** — H128 EXPOSED as seed-luck (drop). H256 reproduces.
-
-### Suggested next actions
-
-Two cheap parallel paths:
-1. **Z2.4** (price action context, 4 dims) — cheapest Z2 sub, ~30 min training, low-risk warm-up
-2. **Z3.1 standalone validation** of S5/S9/S11/S13 — no training, just backtest. Can run in parallel.
-
-Then if either lifts, retrain `VOTE5_H256_DD` with the new state/strategies and call it `VOTE5_v8_H256_DD`.
 
 ---
 
