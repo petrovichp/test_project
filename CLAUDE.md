@@ -1,6 +1,14 @@
 # Crypto Trading ML — Project Context
 
-> **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/baselines.md](docs/baselines.md), [docs/voting_ensemble.md](docs/voting_ensemble.md), [docs/capacity_test.md](docs/capacity_test.md), [docs/trade_quality_by_agreement.md](docs/trade_quality_by_agreement.md), [docs/algo_test.md](docs/algo_test.md), [docs/baseline_vote5_audit.md](docs/baseline_vote5_audit.md), [docs/seed_variance.md](docs/seed_variance.md), [docs/ensemble_baseline.md](docs/ensemble_baseline.md), [docs/state_v6_test.md](docs/state_v6_test.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md), [docs/data_splits.md](docs/data_splits.md), [docs/a2_rule_audit.md](docs/a2_rule_audit.md), [docs/audit_followup_tests.md](docs/audit_followup_tests.md).**
+## Project rules (auto-loaded)
+
+@.claude/rules/data-integrity.md
+@.claude/rules/code-style.md
+@.claude/rules/experiments.md
+@.claude/rules/git.md
+@.claude/rules/agent-workflow.md
+
+> **For results, status, and next steps see [RESULTS.md](RESULTS.md), [docs/baselines.md](docs/baselines.md), [docs/voting_ensemble.md](docs/voting_ensemble.md), [docs/capacity_test.md](docs/capacity_test.md), [docs/trade_quality_by_agreement.md](docs/trade_quality_by_agreement.md), [docs/algo_test.md](docs/algo_test.md), [docs/baseline_vote5_audit.md](docs/baseline_vote5_audit.md), [docs/seed_variance.md](docs/seed_variance.md), [docs/ensemble_baseline.md](docs/ensemble_baseline.md), [docs/state_v6_test.md](docs/state_v6_test.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/next_steps.md](docs/next_steps.md), [docs/data_splits.md](docs/data_splits.md), [docs/a2_rule_audit.md](docs/a2_rule_audit.md), [docs/audit_followup_tests.md](docs/audit_followup_tests.md), [docs/fee_sensitivity_vote5.md](docs/fee_sensitivity_vote5.md), [docs/fee_aware_retrain.md](docs/fee_aware_retrain.md), [docs/fee_improvement_proposals.md](docs/fee_improvement_proposals.md).**
 > Latest findings (2026-05-08): three frozen baselines (see [docs/voting_ensemble.md](docs/voting_ensemble.md)). **`BASELINE_VOTE5`** (seeds 42/7/123/0/99 plurality): WF **+10.40**, fold-6 +5.20, test +4.19, val +3.53. **`BASELINE_VOTE5_DISJOINT`** (seeds 1/13/25/50/77 plurality, validated voting structurally): WF +10.06, fold-6 **+6.11**, test **+6.45**, val +3.79. **`BASELINE_FULL`** (single seed=42): WF +9.03, val **+7.30**. Plurality voting (discrete vote aggregation, tie → NO_TRADE) is structurally beneficial — Q-averaging produces "third action" drift especially on regime-disagreement bars and was abandoned. DQN exit-timing variants (B/C/B5/C2) do not beat rule-based exits in walk-forward (1/6 folds). Production path is Path X (maker-only execution) → live with rule-based exits.
 
 ## What this project is
@@ -71,17 +79,6 @@ docs/        experiments_log.md, next_steps.md
 RESULTS.md   top-level summary
 ```
 
-## Non-negotiable rules
+## Project rules
 
-- **No leakage**: features use only bars `[t − lookback, t]`. `shift(-n)` for labels only.
-- **No random splits**: time-series data is never shuffled. Sequential or walk-forward only.
-- **Normalization**: fit scaler on train split only, transform val/test.
-- **Cross-asset features**: lag predictor asset by 1+ bars.
-- **Rolling windows**: `min_periods=full_window` — NaN early bars, exclude from samples.
-- **Embargo**: leave `label_length` bar gap between train end and val/test start.
-- **Test split is locked**: touch only after val tuning is frozen.
-- **Cache rule**: any computation > 10s saves to `cache/*.npz` or `*.parquet`. Always check before recomputing.
-
-## Code style
-
-No docstring walls. Comments only for non-obvious decisions. No inline summaries of what was just done.
+See [.claude/rules/](.claude/rules/) — `data-integrity.md`, `code-style.md`, `experiments.md`, `git.md`, `agent-workflow.md`. These are auto-loaded into Claude's context via `@import` in the header above.
