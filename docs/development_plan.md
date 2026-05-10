@@ -44,7 +44,7 @@ The zero-fee assumption corresponds to maker-only execution. Per [docs/fee_impro
 
 ## Phase Z1 — Stack the proven winners (low-risk)
 
-Test combinations of independently-validated improvements. None of these have been tried together.
+Test combinations of independently-validated improvements. None of these have been tried together; each has been validated in isolation. Phase Z1 is the cheapest with the highest probability of incremental progress — it doesn't require new logic, just new training runs with existing flags.
 
 | ID | Experiment | Why | Cost |
 |---|---|---|---|
@@ -54,6 +54,106 @@ Test combinations of independently-validated improvements. None of these have be
 | Z1.4 | **Disjoint validation of H256 + H128** | Confirm capacity gains are structural, not seed-luck | ~6 h |
 
 **Decision gate**: Z1 winners go to Phase Z2 as the new baseline. WF +12 with 6/6 folds positive is the target.
+
+### Z1 detailed sub-plan
+
+#### Z1.1 — H256 + Double_Dueling stack
+
+**Hypothesis**: H256 (capacity) and DD (regularization) are orthogonal axes. H256 lifts WF aggregate (+11.86 vs +10.40) but hurts fold-6 (+0.41 vs +5.20). DD wins val (+6.12 vs +3.53) and 6/6 folds with smoother per-fold distribution. **Stacking them should preserve H256's WF lift while DD's regularization recovers fold-6 robustness.**
+
+**Method**:
+```
+for SEED in 42 7 123 0 99; do
+  python3 -m models.dqn_selector btc \
+    --tag VOTE5_H256_DD_seed${SEED} \
+    --hidden 256 --algo double_dueling \
+    --fee 0.0 --trade-penalty 0.001 --seed ${SEED}
+done
+```
+Then evaluate as K=5 plurality ensemble at fee=0 across val, test, 6 WF folds.
+
+**Code touchpoints**: no new code — `--hidden 256 --algo double_dueling` already supported in [models/dqn_selector.py](../models/dqn_selector.py).
+
+**Decision criterion**: keep if WF ≥ +11.5 AND fold-6 ≥ +3.0 AND 6/6 folds positive. (i.e. preserves most of H256's WF lift AND recovers most of DD's fold-6.)
+
+**Risks**:
+- Higher capacity nets are slower to train; 5 seeds × ~5 min = 25 min training
+- Combined regularization might *over-regularize* — DD on top of H256's already-larger param count could damp signal
+- Per-seed variance is bigger at h=256 (capacity_test showed seed=42 only +8.92 WF vs the +11.86 ensemble)
+
+**Expected outcome**: WF +11.0 to +12.5, fold-6 +3 to +6, 5/6 to 6/6 folds. If outside this range, the stack didn't compose.
+
+#### Z1.2 — K=10 plurality ensemble (vanilla DQN)
+
+**Hypothesis**: K=5 already smooths variance vs single-seed (+10.40 vs +9.03). K=10 should smooth further, especially on fold-6 (single-seed std ~±2.17 in seed_variance). The disjoint validation already gave us 5 *additional* seeds (1, 13, 25, 50, 77) that produced WF +10.06 — combining all 10 should beat both K=5 baselines.
+
+**Method**:
+- Members already trained: seeds 42, 7, 123, 0, 99 + 1, 13, 25, 50, 77 (10 total).
+- No new training. Just construct K=10 plurality ensemble at evaluation:
+```python
+nets = [load_dqn(tag) for tag in [
+    "BASELINE_FULL", "BASELINE_FULL_seed7", ..., "BASELINE_FULL_seed77"]]
+# 10 nets, plurality mode, tie → NO_TRADE
+```
+Run through `evaluate_with_policy` on val + test + 6 WF folds.
+
+**Code touchpoints**: no training. Just an eval script that calls [`models/voting_ensemble.py`](../models/voting_ensemble.py) `_VotePolicy(nets, mode="plurality")` with 10 nets.
+
+**Decision criterion**: keep if WF ≥ +10.6 (the disjoint K=5) AND fold-6 ≥ +5.0 AND 6/6 folds positive. (Improves on the better of the two K=5 baselines.)
+
+**Risks**:
+- With 10 nets and plurality voting, ties become more frequent (10 has more ways to split than 5). Tie → NO_TRADE means more skipped trades, hurting Sharpe via √N.
+- Could be that 5 already saturates the ensemble benefit and 10 just adds compute.
+
+**Cost note**: marked ~6 h above but actual cost is **0 training, ~5 min eval** since all 10 seeds are already trained.
+
+#### Z1.3 — K=10 Double_Dueling
+
+**Hypothesis**: same as Z1.2 but for DD. Currently we only have 5 DD seeds (42, 7, 123, 0, 99). Need 5 additional seeds for K=10.
+
+**Method**:
+```
+for SEED in 1 13 25 50 77; do
+  python3 -m models.dqn_selector btc \
+    --tag VOTE10_DD_seed${SEED} --algo double_dueling \
+    --fee 0.0 --trade-penalty 0.001 --seed ${SEED}
+done
+```
+Then K=10 plurality across all 10 DD seeds.
+
+**Code touchpoints**: no new code.
+
+**Decision criterion**: gated on Z1.2. If Z1.2 doesn't show K=10 benefit over K=5, skip Z1.3 entirely (don't burn 25 min training for no expected gain).
+
+**Risks**:
+- DD already has more bias/variance than vanilla DQN; K=10 may not buy as much
+- The 5 new seeds may not match the original 5's distribution
+
+#### Z1.4 — Disjoint validation of H256 + H128
+
+**Hypothesis**: H128 wins fold-6 (+10.70) but is 5/6 folds. H256 wins WF aggregate (+11.86) but fold-6 is +0.41. Could these results be seed-specific (we used the same 5 seeds 42/7/123/0/99 for both capacity tests)? Train another 5 seeds at h=128 and h=256 with the disjoint pool {1, 13, 25, 50, 77} and compare.
+
+**Method**:
+```
+for H in 128 256; do
+  for SEED in 1 13 25 50 77; do
+    python3 -m models.dqn_selector btc \
+      --tag VOTE5_H${H}_DISJOINT_seed${SEED} \
+      --hidden ${H} --fee 0.0 --trade-penalty 0.001 --seed ${SEED}
+  done
+done
+```
+Then evaluate two ensembles (H128_DISJOINT, H256_DISJOINT) and compare to the original.
+
+**Code touchpoints**: no new code.
+
+**Decision criterion**: keep if disjoint ensemble reproduces ±0.5 of original ensemble's WF AND fold-6. If disjoint diverges sharply, the original capacity result was seed-luck.
+
+**Risks**:
+- 10 new training runs (~30-50 min total at h=128, ~50-70 min at h=256). Substantial wall-time investment for what is essentially a sanity check.
+- If results diverge, undermines confidence in H128/H256 as deployable baselines.
+
+**Why it matters**: any capacity-based deployment decision needs disjoint-validated evidence. Currently H128/H256 baselines are 1-pool of 5 seeds — same epistemic standard as before plurality voting was validated structurally.
 
 ## Phase Z2 — Better state (medium-risk)
 
@@ -69,6 +169,133 @@ The state vector is currently 50 dims, BTC-only, no perp basis. Multiple signals
 **Decision gate**: each Z2 experiment is run independently against the Z1 winner. Keep additions that lift WF by ≥+0.5 with no fold regression > 0.5. Combine survivors in Z2.5.
 
 | Z2.5 | **Combined state v7**: stack all surviving features into one expanded state | Test additivity of state improvements | ~6 h |
+
+### Z2 detailed sub-plan
+
+The current state vector is 50 dims, defined in [models/dqn_state.py](../models/dqn_state.py). Adding new features means: regenerate `cache/btc_dqn_state_*.npz` with the expanded vector, retrain VOTE5 (5 seeds), evaluate. State dimension changes from 50 → 50 + N where N is the number of added features.
+
+**Common implementation per Z2 experiment**:
+1. Add feature computation in [features/](../features/) (cache result if expensive).
+2. Modify `_assemble_state(...)` in [models/dqn_state.py](../models/dqn_state.py) to append the new features to the existing state vector.
+3. Update `state_dim` parameter in `models/dqn_selector.py` (currently hardcoded to 50 in places) — **add a `--state-dim` CLI flag** if not present.
+4. Use a new `--state-version` tag (e.g. `v7_xasset`) to avoid overwriting the v5 cache.
+5. Train 5 seeds with `--state-version v7_xasset --tag Z2_xasset_seed{S}`.
+6. Evaluate as K=5 plurality on val + test + WF.
+
+**Per-experiment specifics**:
+
+#### Z2.1 — Cross-asset state (ETH + SOL features)
+
+**Hypothesis**: BTC, ETH, SOL move with strong correlation but with lag relationships. ETH typically leads BTC by minutes in trend transitions. Adding lagged ETH/SOL signals should give the policy advance warning of regime shifts.
+
+**Features added** (8 dims, all lagged by 1+ bars per data-integrity rule):
+```
+state[50] = ETH_return_1bar       (lagged 1 bar)
+state[51] = ETH_return_5bar       (lagged 1 bar)
+state[52] = ETH_vol_ratio         (ATR_30 / median_ATR_60)
+state[53] = ETH_taker_imbalance   (net taker flow)
+state[54] = SOL_return_1bar       (lagged 1 bar)
+state[55] = SOL_return_5bar
+state[56] = SOL_vol_ratio
+state[57] = SOL_taker_imbalance
+```
+
+**Code touchpoints**:
+- Feature extraction: extend [features/assembly.py](../features/) to compute ETH/SOL features from `cache/okx_ethusdt_*` and `cache/okx_solusdt_*` parquets.
+- State assembly: append to `_assemble_state` in `models/dqn_state.py`.
+
+**Decision criterion**: WF ≥ +10.9 (i.e., ≥+0.5 over Z1 winner) AND no fold worse by >0.5.
+
+**Risks**:
+- ETH/SOL data may not align timestamp-perfectly with BTC. Need to verify alignment in `data/loader.py`.
+- Cross-asset features add 8 dims to state, growing param count. Could reduce sample efficiency.
+- Lead-lag is unstable across regimes — strong in some periods, weak in others.
+
+**Expected**: small lift (+0.3 to +1.0 WF) if cross-asset signal is genuinely orthogonal; null if BTC's own features already capture macro state.
+
+#### Z2.2 — Perp basis + funding state
+
+**Hypothesis**: Perp-spot basis and funding rate changes are leading indicators of leverage-driven moves (squeezes, liquidations). Currently in features but not in state.
+
+**Features added** (5 dims):
+```
+state[50] = basis_z_60       (perp/spot z-score over 60 bars)
+state[51] = basis_change_1bar (delta basis)
+state[52] = funding_rate_apr  (current 8h rate annualized)
+state[53] = funding_z_120     (funding z-score over 120 bars)
+state[54] = oi_change_60      (open interest change rate, normalized)
+```
+
+**Code touchpoints**:
+- All inputs already in `meta` parquet. Just compute and append to state.
+
+**Decision criterion**: WF ≥ +10.9 AND val ≥ +3.0 (basis features should help OOD val period).
+
+**Risks**:
+- Funding only changes every 8h → 5/8 of the "funding signal" is constant within a window. Z-score within rolling 120 may catch transitions but the signal is sparse.
+- Basis Z-score behavior is asymmetric in this dataset (median basis = −4.55 bps). Z-score normalization handles it but the policy may overfit on the asymmetry.
+
+**Expected**: this is the most promising Z2 candidate IMO. Funding/basis are the kind of "macro context" current state lacks.
+
+#### Z2.3 — OB depth features (deeper liquidity context)
+
+**Hypothesis**: Current state has summary OB metrics (`spot_imbalance`, `bid_concentration`). Adding cumulative depth at multiple price ranges (±2%, ±5%, ±10%) gives the policy more nuanced liquidity context — useful for trade quality conditioning.
+
+**Features added** (6 dims):
+```
+state[50] = spot_depth_2pct_imbalance   (bid - ask) / (bid + ask) at ±2%
+state[51] = spot_depth_5pct_imbalance
+state[52] = spot_depth_10pct_imbalance
+state[53] = perp_depth_2pct_imbalance
+state[54] = perp_depth_5pct_imbalance
+state[55] = perp_depth_10pct_imbalance
+```
+
+**Code touchpoints**:
+- Feature extraction: compute from raw OB parquet (~2 min per pass for full 384k rows × 800 cols).
+- Cache result to `cache/btc_ob_depth_features.parquet`.
+
+**Decision criterion**: WF ≥ +10.9. Fold-6 specifically should hold (recent regime is liquid; depth signal less informative there).
+
+**Risks**:
+- OB depth is noisy at 1-min granularity. Spoofing affects deeper price ranges.
+- Computing 200 bin amounts × 384k rows is slow first-pass; cache is essential.
+
+**Expected**: marginal lift unless current `spot_imbalance` summary is too lossy. Lower priority than Z2.2.
+
+#### Z2.4 — Price action context (cheapest)
+
+**Hypothesis**: Recent price extremes (run-up/down magnitude over last 60 bars) and realized vol are not in state. These are simple features that condition the policy on current trend strength.
+
+**Features added** (4 dims):
+```
+state[50] = price_max_60 / price_now - 1   (how far from recent high)
+state[51] = price_now / price_min_60 - 1   (how far from recent low)
+state[52] = realized_vol_60                (std of returns over 60 bars)
+state[53] = vol_ratio_30_60                (ATR_30 / ATR_60)
+```
+
+**Code touchpoints**: trivial — all derivable from price array.
+
+**Decision criterion**: WF ≥ +10.9.
+
+**Risks**:
+- Likely redundant with regime-id and ATR already in state.
+- Cheapest experiment in Z2 (~30 min training); even if it fails, low cost.
+
+**Expected**: small or null lift. Run as warm-up because it's cheap.
+
+#### Z2.5 — Combined state v7
+
+**Hypothesis**: Survivors of Z2.1-Z2.4 may be additive. Stacking them into one expanded state could lift more than any single feature group.
+
+**Method**: combine all features that survived their individual decision gates into one state vector. Train VOTE5_v7 with the combined state. Compare to Z1 winner and to each Z2.x sub-result.
+
+**Decision criterion**: WF ≥ max(Z2.1, Z2.2, Z2.3, Z2.4) + 0.3 (combined must improve on best singleton).
+
+**Risks**:
+- State dim could balloon (e.g. 50 + 8 + 5 + 6 + 4 = 73 dims). Higher capacity needed for the same information density.
+- Some features may be redundant across groups (e.g. `vol_ratio_30_60` in Z2.4 partially overlaps with the regime classifier's input).
 
 ## Phase Z3 — Better signals (medium-risk)
 
@@ -365,12 +592,88 @@ The four Z4 experiments are mostly independent — Z4.1 (distillation) operates 
 
 ## Phase Z5 — Validation & freeze (mandatory before any deployment)
 
+Z5 is **gate-keeping**, not exploratory. After Z1–Z4 produce a winning policy, Z5 is the disciplined freeze process: stress-test, confirm reproducibility, document, and lock the artifact.
+
 | ID | Step | Why |
 |---|---|---|
 | Z5.1 | **Out-of-distribution stress test**: run final policy on Apr-May 2026 data not yet used | Locked test only used once; this is the second OOD check |
 | Z5.2 | **Seed variance ±2σ check** with 10 seeds | Confirm ensemble Sharpe range is wholly above +10.40, not borderline |
 | Z5.3 | **Fee-curve at non-zero fees** for the new winner | Even though path is zero-fee-targeted, the fee curve tells us robustness margin |
 | Z5.4 | **Freeze new baseline** in `docs/baselines.md` + tag in registry | Reproducibility requirement |
+
+### Z5 detailed sub-plan
+
+#### Z5.1 — Out-of-distribution stress test
+
+**Hypothesis**: Locked test split was used once during Z1–Z4 to make decisions. Any Z-phase winner has had >1 evaluation on it (per fold + final pick), so test is no longer truly OOD. Need a fresh slice that no policy has seen.
+
+**Method**:
+- Hold out the most-recent ~20-30 days of data (post-2026-04-01 if not already used) as **`OOD_LOCK`**. Verify it's not in `train`, `val`, or `test`.
+- Single-shot evaluation only — record `OOD_LOCK` Sharpe + equity once; never iterate on it.
+- If `OOD_LOCK` data isn't yet collected, this is a **prerequisite** before deployment: pull fresh data + recompute features.
+
+**Decision criterion**: Sharpe on `OOD_LOCK` ≥ 0.7 × WF mean. (Allow some degradation; pure equality would be unrealistic.) If `OOD_LOCK` is sharply negative, the Z-phase winner overfit to the WF distribution and shouldn't ship.
+
+**Code touchpoints**:
+- New script `models/eval_ood_lock.py` that loads policy + OOD slice + computes single-shot metrics.
+- New cache file `cache/btc_dqn_state_ood_lock.npz` for the OOD state arrays.
+
+**Risks**:
+- May not have enough OOD data on hand. Pulling fresh data is a separate engineering task (~1 day).
+- Even OOD periods can correlate with prior periods if regime is similar.
+
+#### Z5.2 — Seed variance with 10 seeds
+
+**Hypothesis**: A K=5 ensemble's reported metric is one draw from a distribution. Need to confirm the ±2σ band is wholly above the previous baseline (+10.40 vanilla VOTE5), not borderline.
+
+**Method**:
+- For the Z-phase winner config (e.g. `VOTE5_H256_DD`), train **10 seeds** instead of 5. Use seeds {42, 7, 123, 0, 99, 1, 13, 25, 50, 77}.
+- Run two K=5 ensembles using disjoint pools: `{42, 7, 123, 0, 99}` and `{1, 13, 25, 50, 77}`. Each gives one Sharpe.
+- Bootstrap K=5 ensembles by sampling 5 of 10 seeds, 100 times → distribution of K=5 ensemble Sharpes.
+- Report: mean, ±2σ band, min, max.
+
+**Decision criterion**:
+- Mean WF Sharpe > +10.40 (beats current baseline)
+- Mean − 2σ > +9.0 (lower bound is still strong)
+- No single sampled K=5 ensemble below +7.5 (no catastrophic seed combinations)
+
+**Code touchpoints**:
+- New script `models/seed_variance_z5.py` that does the bootstrap sampling.
+- Reuses [`models/voting_ensemble.py`](../models/voting_ensemble.py).
+
+**Risks**:
+- 10 seeds × Z-phase-winner training time = significant cost (could be 1-2 hours per config).
+- Bootstrap of 100 samples is fine for variance estimate; smaller may be noisy.
+
+#### Z5.3 — Fee-curve robustness check
+
+**Hypothesis**: Zero-fee winner still needs to be characterized at non-zero fees. If Sharpe collapses at fee=2 bp, deployment depends on maker tier (more risk). If it holds at fee=4.5 bp, we have margin.
+
+**Method**: Reuse [`models/audit_vote5_dd.py`](../models/audit_vote5_dd.py) Part B-style fee sweep on the Z-phase winner. Evaluate at fees ∈ {0, 1, 2, 4, 4.5, 6, 8} bp/side.
+
+**Decision criterion**: characterize the curve, no pass/fail. Used to inform deployment risk management — if Sharpe → 0 at 2 bp, capital allocation must reflect that fee sensitivity.
+
+**Code touchpoints**: parameterize the existing fee-sweep script with a `--policy-tag` flag.
+
+**Risks**: none — diagnostic.
+
+#### Z5.4 — Freeze + register + document
+
+**Method**:
+1. Add policy entry to `model_registry.json` per [`.claude/rules/model-registry.md`](../.claude/rules/model-registry.md). Include all eval results from Z5.1-Z5.3.
+2. Add the policy to [docs/baselines.md](baselines.md) with full reproduction spec (training command, seed list, hyperparameters, eval results).
+3. Update [RESULTS.md](../RESULTS.md) status block with the new frozen baseline as the headline.
+4. Update this development plan: mark Z1–Z5 phases as DONE in the execution-status table; record the frozen baseline tag.
+5. Tag the git commit as `baseline-{name}-frozen-YYYY-MM-DD` for fast retrieval.
+
+**Decision criterion**: nothing — Z5.4 is mechanical. Either the Z5.1-Z5.3 results pass the bar or they don't.
+
+**Risks**:
+- Documentation drift: future-me will need to find this baseline by tag. If the tag isn't applied, the baseline becomes hard to reconstitute later.
+
+### Z5 sequencing
+
+Z5.1, Z5.2, Z5.3 can run in parallel (independent computations). Z5.4 must run last (it's the freeze). Total wall-time: ~3-5 hours depending on Z5.2's training cost.
 
 ---
 
@@ -388,6 +691,77 @@ Full prioritized plan in [docs/fee_improvement_proposals.md](fee_improvement_pro
 | F4 | **Asymmetric exits by regime** | regime-conditioned TP/SL scaling | ~2 h |
 
 **Hard ceiling**: per the fee analysis, even the best filter at 4.5 bp gives WF +3.72 vs +10.40 zero-fee. Everything F1–F4 is bounded above by that ceiling unless F2 (maker-only) breaks it.
+
+### Path F detailed sub-plan (high-level — full plan in [fee_improvement_proposals.md](fee_improvement_proposals.md))
+
+#### F1 — Cheap post-hoc improvements (highest cost-benefit)
+
+**Why first**: all four sub-experiments are no-retrain or minor-retrain. Combined wall-time ~4 h. Even small Sharpe lifts compound when fees are eating most of the alpha.
+
+| F1 sub | Approach | Expected lift @ 4.5 bp |
+|---|---|---|
+| F1.1 | **Vote-strength sizing** — size = {3v: 0.4, 4v: 0.7, 5v: 1.0}. A2 audit showed 5-vote trades have ~3× mean PnL of 3-vote trades. | +0.5 to +1.5 Sharpe |
+| F1.2 | **Q-margin threshold** — `Q[a*] − Q[no_trade] ≥ τ` per net before voting. Calibrate τ on train. | +0.3 to +0.8 |
+| F1.3 | **Tighter TP for trend strategies** — `--tp-scale 0.85` and `0.70` (audit follow-up #4 from `audit_followup_tests.md`, never run) | +1.0 to +2.0 |
+| F1.4 | **Funding-rate offset in reward** — add `fund_rate × bars_held / 525960` to per-trade pnl. Marginal trades may flip net-positive. | +0.5 (asymmetric: helps shorts in bear funding) |
+
+**Decision criterion**: each sub-experiment passes if WF lift ≥ +0.3 at fee=4.5 bp with no fold worse by >0.5. Combine survivors in a stacked test.
+
+#### F2 — Maker-fill-rate scoping (engineering)
+
+**This is not research; it's a feasibility study.** Output: a number — what fraction of post-only orders fill within 1-2 bars of placement, given OB depth conditions in the dataset?
+
+**Method**:
+1. For every entry signal in the existing `BASELINE_VOTE5` audit log (1,122 trades), simulate placing a post-only order at the best price.
+2. Walk forward through the OB parquet — does the price come back to the post-only level within N bars?
+3. Compute fill rate per regime, per strategy, per trade direction.
+
+**Decision criterion**: maker-only viable if fill rate ≥ 70% within 2 bars across all regimes. Below that, must accept partial maker / partial taker hybrid.
+
+**Code touchpoints**:
+- New `models/maker_fill_simulation.py` — uses `cache/okx_btcusdt_*_ob.parquet` directly.
+- Output: per-strategy, per-regime fill-rate table.
+
+**Risks**:
+- OB data is sampled at 1-min snapshots — sub-second behavior is invisible.
+- Fill simulation assumes price-time priority but real exchanges have queue position effects.
+
+**Cost**: ~2 h script + analysis.
+
+**If it works**: Path F is largely redundant — zero-fee path is real. If maker-only fails this gate, Path F becomes critical.
+
+#### F3 — Architectural fee-aware retrains
+
+**Hypothesis**: The current FEE4_p001 / FEE4_p005 retrains had fee in reward but not in state. Adding fee as a state feature lets the policy learn fee-conditional behavior; one model trained at multiple fee levels generalizes.
+
+**F3.1 — Fee in state**:
+- Add `state[N] = fee_bp / 10` to state vector.
+- Train with random fee per episode ∈ {0, 2, 4.5, 8} bp.
+- Eval at each fee level and check if one model dominates the per-fee-trained models.
+
+**F3.2 — QR-DQN with CVaR action selection**:
+- Same as Z4.4 but specifically for fee robustness.
+- Hypothesis: tail-aware action selection naturally penalizes high-variance trades that fees can flip.
+
+**F3.3 — Direct net-edge regression**:
+- Skip Q-learning; regress `E[pnl − 2×fee]` directly per (state, action).
+- Trade only if net-edge prediction > 0.
+
+**Decision criterion**: each F3 sub must beat the F1 winner (vanilla + filter or vote-strength sized) on WF at fee=4.5 bp by ≥+0.5 Sharpe.
+
+**Risks**: 1-2 days each. High implementation cost for uncertain gain. Defer until F1 winners established.
+
+#### F4 — Asymmetric exits by regime
+
+**Hypothesis**: The 5 regime classes have different optimal TP/SL. Current configs are static per strategy. Trending regimes warrant wider TP; chop wants tighter (fewer time-stops, fewer fee-eating slow trades).
+
+**Method**: `tp_scale[regime] × base_tp` lookup. Calibrate scaling factors on train (e.g. `{calm: 1.0, trend_up: 1.3, trend_down: 1.3, ranging: 0.85, chop: 0.7}`).
+
+**Decision criterion**: WF lift ≥+0.5 at fee=4.5 bp.
+
+**Cost**: ~2 h.
+
+**Risk**: regime labels are CUSUM-derived and noisy; per-regime scaling can amplify noise.
 
 ---
 
