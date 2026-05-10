@@ -11,6 +11,7 @@
 - Every meaningful experiment gets a `docs/{experiment_name}.md` doc with: what was tested, the command(s), the per-fold + aggregate results table, and a verdict.
 - Cross-link new docs from `CLAUDE.md` and from the `docs/experiments_log.md` if it exists.
 - After committing, the doc must be enough for someone (including future-me) to reproduce without rereading the conversation.
+- If the experiment trained any new model artifact, also follow [model-registry.md](model-registry.md) — register every `.pt` / `.txt` file in `model_registry.json`.
 
 ## Comparison discipline
 

@@ -5,6 +5,7 @@
 @.claude/rules/data-integrity.md
 @.claude/rules/code-style.md
 @.claude/rules/experiments.md
+@.claude/rules/model-registry.md
 @.claude/rules/git.md
 @.claude/rules/agent-workflow.md
 
