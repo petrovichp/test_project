@@ -103,6 +103,8 @@ def rollout_chunk(
     valid_mask_override: np.ndarray = None,   # optional (n_actions,) bool to AND with per-bar mask
     fee: float = None,               # if None, uses TAKER_FEE; else parameterized
     trade_penalty: float = 0.0,      # fixed cost subtracted from buffer reward per trade entry
+    regime_id: np.ndarray = None,    # (n_bars,) regime labels; required if allowed_regimes set
+    allowed_regimes: set = None,     # if non-empty, skip bars whose regime not in this set
 ):
     """Continuous rollout that pushes up to `max_transitions` new transitions
     into `buffer` and returns updated cursor (t, equity, peak, last_pnl).
@@ -130,6 +132,20 @@ def rollout_chunk(
         if t >= n_bars - 2:
             t = 0
             equity, peak, last_pnl = 1.0, 1.0, 0.0
+
+        # Curriculum learning: skip bars whose regime not in allowed set.
+        if allowed_regimes is not None and regime_id is not None:
+            skipped = 0
+            while int(regime_id[t]) not in allowed_regimes:
+                t += 1
+                skipped += 1
+                if t >= n_bars - 2:
+                    t = 0
+                    equity, peak, last_pnl = 1.0, 1.0, 0.0
+                if skipped > n_bars:        # safety: no bars match → abort filter
+                    break
+            if skipped > n_bars:
+                break                       # no allowed bars exist; exit rollout
 
         s_t = state[t].copy()
         s_t[18] = float(np.clip(last_pnl       * 100.0, -10.0, 10.0))

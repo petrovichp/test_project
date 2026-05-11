@@ -1,5 +1,10 @@
 # Crypto Trading ML — Results & Conclusions
 
+> **Status (2026-05-11, post Path A + C1):**
+> - **A3 — VOTE5_v8 IS PARTLY SEED-LUCK** ([docs/path_a_c1_results.md](docs/path_a_c1_results.md)). Disjoint-pool retrain {1,13,25,50,77}: WF +8.91, val **−2.12** (vs orig +6.67), test +5.62. Mean across pools: WF +10.49, val +2.28. Structural 6/6 fold positivity preserved → keep as primary, but **realistic expectations**: WF ~+10.5, val ~+2-3. The action-space lift from S11+S13 is real but smaller than the headline +12.07 suggested.
+> - **A2 fee curve on v8** — at 4.5 bp (OKX taker): WF +4.58, val −5.77, test −5.08. Best fee robustness of any baseline (vs prior best vanilla+filter at +3.72). Breakeven ~5 bp. Maker-only remains the only path to zero-fee Sharpe.
+> - **C1 Curriculum (Z4.3) — NEGATIVE.** Training calm regime first, then adding trends/chop in phases, catastrophically hurt WF (-8.72) without improving fold-6 (Δ -0.35). Hypothesis: regime gating biases the buffer and deprives the policy of trajectory diversity; rare regimes (ranging, chop) get too few samples in phase 3. Curriculum doesn't work on this signal.
+>
 > **Status (2026-05-11, post Z2/Z3 Step 5):**
 > - **Step 5 NEGATIVE-on-aggregate** ([docs/z2_z3_results.md](docs/z2_z3_results.md)). Combining v7_basis state (Step 3) + v8 action space (Step 4) does NOT compose. WF dropped from +12.07 to +10.47 (Δ −1.60), val from +6.67 to +4.40 (Δ −2.27). Hypothesis: feature overlap — basis info in both state (Step 3 features) and action (S11 strategy uses basis) creates redundancy that hurts the policy. **`VOTE5_v8_H256_DD` remains primary baseline.** `VOTE5_v9_H256_DD` retained as fold-6 / test-robust alternative (test +7.04 best in v8-family, fold-6 +6.95).
 >

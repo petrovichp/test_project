@@ -243,7 +243,7 @@ def evaluate_policy(net: DQN, state, valid, signals, prices,
 def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
            tag: str = "v1", fee: float = None, trade_penalty: float = 0.0,
            ablate_actions: list = None, state_version: str = "v5",
-           hidden: int = 64, algo: str = "dqn"):
+           hidden: int = 64, algo: str = "dqn", curriculum: bool = False):
     torch.manual_seed(seed); np.random.seed(seed)
     rng_warm = np.random.default_rng(seed)
     rng_eps  = np.random.default_rng(seed + 1)
@@ -319,11 +319,31 @@ def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
 
     print(f"  online net params: {online.n_params():,}  optimizer Adam lr={LR}")
 
+    # ── curriculum learning setup ────────────────────────────────────────────
+    # Regime ids: 0=calm, 1=trend_up, 2=trend_down, 3=ranging, 4=chop
+    if curriculum:
+        regime_id_tr = sp_tr["regime_id"]
+        CURRICULUM_PHASES = [
+            (0,       50_000,  {0}),                  # Phase 1: calm only
+            (50_000,  120_000, {0, 1, 2}),            # Phase 2: + trends
+            (120_000, 10**9,   {0, 1, 2, 3, 4}),      # Phase 3: all regimes
+        ]
+        def current_phase_regimes(step: int):
+            for s, e, regs in CURRICULUM_PHASES:
+                if s <= step < e:
+                    return regs
+            return {0, 1, 2, 3, 4}
+        print(f"  CURRICULUM: 3 phases — calm only (0-50k) → +trends (50-120k) → all (120k+)")
+    else:
+        regime_id_tr = None
+        def current_phase_regimes(step: int): return None
+
     # ── warmup with random policy ────────────────────────────────────────────
     print(f"\n  Warmup: {WARMUP_STEPS:,} random transitions ...")
     cursor_tr = dict(t=0, equity=1.0, peak=1.0, last_pnl=0.0)
     rand_pol = _UniformRandom(rng_warm)
     t_warm = time.perf_counter()
+    warmup_regs = current_phase_regimes(0)
     while len(buf) < WARMUP_STEPS:
         cursor_tr = rollout_chunk(
             sp_tr["state"], sp_tr["valid_actions"], sp_tr["signals"], sp_tr["price"],
@@ -332,6 +352,7 @@ def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
             max_transitions=min(2000, WARMUP_STEPS - len(buf)),
             reward_scale=REWARD_SCALE, valid_mask_override=valid_override,
             fee=fee, trade_penalty=trade_penalty,
+            regime_id=regime_id_tr, allowed_regimes=warmup_regs,
         )
     n_trade_in_buf = int((buf.action[:len(buf)] != 0).sum())
     print(f"    buffer={len(buf):,} after warmup  ({n_trade_in_buf:,} trades, "
@@ -366,6 +387,7 @@ def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
                 max_transitions=REFRESH_M,
                 reward_scale=REWARD_SCALE, valid_mask_override=valid_override,
                 fee=fee, trade_penalty=trade_penalty,
+                regime_id=regime_id_tr, allowed_regimes=current_phase_regimes(step),
             )
 
         # gradient step
@@ -485,8 +507,12 @@ if __name__ == "__main__":
     ap.add_argument("--algo", default="dqn",
                      choices=["dqn", "double", "dueling", "double_dueling"],
                      help="RL algorithm: dqn (default), double, dueling, or both")
+    ap.add_argument("--curriculum", action="store_true",
+                     help="Phase Z4.3 curriculum learning by regime difficulty: "
+                          "calm (steps 0-50k) → +trends (50k-120k) → all (120k+)")
     args = ap.parse_args()
     ablate = [int(x) for x in args.ablate_actions.split(",") if x.strip()]
     train(args.ticker, seed=args.seed, action_mode=args.mode, tag=args.tag,
            fee=args.fee, trade_penalty=args.trade_penalty, ablate_actions=ablate,
-           state_version=args.state_version, hidden=args.hidden, algo=args.algo)
+           state_version=args.state_version, hidden=args.hidden, algo=args.algo,
+           curriculum=args.curriculum)
