@@ -1,5 +1,8 @@
 # Crypto Trading ML — Results & Conclusions
 
+> **Status (2026-05-11, post Path C2 — distillation):**
+> - **C2 self-distillation — MIXED / DEPLOYMENT WIN** ([docs/distill_vote5.md](docs/distill_vote5.md)). Single student net trained with masked CE on VOTE5_v8_H256_DD plurality labels: best seed (42) hits **WF +9.99, val +10.41, test +9.35** (6/6 folds, 291 test trades). **Mean of 5 single distilled seeds: WF +8.30, val +8.30, test +7.85 — exceeds teacher's test (+4.44) by +3.41.** Voting distilled students *hurts* (DISTILL_v8 VOTE5: WF +7.13) — correlated students (same labels) lose plurality benefit. Verdict: **single distilled net is a viable 5× cheaper deployment artifact**; for max WF, keep teacher ensemble; for cheap+test-robust inference, use `DISTILL_v8_seed42`. Path X (maker-only execution) and Z2.1 (ETH/SOL cross-asset) still open.
+>
 > **Status (2026-05-11, post Path A + C1):**
 > - **A3 — VOTE5_v8 IS PARTLY SEED-LUCK** ([docs/path_a_c1_results.md](docs/path_a_c1_results.md)). Disjoint-pool retrain {1,13,25,50,77}: WF +8.91, val **−2.12** (vs orig +6.67), test +5.62. Mean across pools: WF +10.49, val +2.28. Structural 6/6 fold positivity preserved → keep as primary, but **realistic expectations**: WF ~+10.5, val ~+2-3. The action-space lift from S11+S13 is real but smaller than the headline +12.07 suggested.
 > - **A2 fee curve on v8** — at 4.5 bp (OKX taker): WF +4.58, val −5.77, test −5.08. Best fee robustness of any baseline (vs prior best vanilla+filter at +3.72). Breakeven ~5 bp. Maker-only remains the only path to zero-fee Sharpe.

@@ -3129,5 +3129,77 @@
         4.09
       ]
     }
+  },
+  "DISTILL_v8_seed42": {
+    "ticker": "btc",
+    "model_type": "distill",
+    "tag": "DISTILL_v8_seed42",
+    "seed": 42,
+    "algo": "supervised_ce",
+    "hidden": 256,
+    "state_version": "v8_s11s13",
+    "teacher": "VOTE5_v8_H256_DD",
+    "loss": "masked_cross_entropy",
+    "stratified_batch": "50/50 NO_TRADE/trade",
+    "epochs": 12,
+    "ensemble_role": "DISTILL_v8_VOTE5_seed42",
+    "val_sharpe": 10.414,
+    "test_sharpe": 9.354,
+    "wf_mean_sharpe": 9.992,
+    "wf_folds_positive": 6,
+    "n_trades_test": 291,
+    "model_file": "btc_dqn_policy_DISTILL_v8_seed42.pt",
+    "trained_at": "2026-05-11",
+    "notes": "C2 — single net distilled from VOTE5_v8_H256_DD plurality labels. Strongest individual seed."
+  },
+  "DISTILL_v8_seed7": {
+    "ticker": "btc", "model_type": "distill", "tag": "DISTILL_v8_seed7", "seed": 7,
+    "algo": "supervised_ce", "hidden": 256, "state_version": "v8_s11s13",
+    "teacher": "VOTE5_v8_H256_DD", "loss": "masked_cross_entropy", "epochs": 12,
+    "ensemble_role": "DISTILL_v8_VOTE5_seed7",
+    "val_sharpe": 7.573, "test_sharpe": 7.785, "wf_mean_sharpe": 7.299,
+    "wf_folds_positive": 6, "n_trades_test": 265,
+    "model_file": "btc_dqn_policy_DISTILL_v8_seed7.pt", "trained_at": "2026-05-11",
+    "notes": "C2 distilled student, seed 7"
+  },
+  "DISTILL_v8_seed123": {
+    "ticker": "btc", "model_type": "distill", "tag": "DISTILL_v8_seed123", "seed": 123,
+    "algo": "supervised_ce", "hidden": 256, "state_version": "v8_s11s13",
+    "teacher": "VOTE5_v8_H256_DD", "loss": "masked_cross_entropy", "epochs": 12,
+    "ensemble_role": "DISTILL_v8_VOTE5_seed123",
+    "val_sharpe": 7.716, "test_sharpe": 10.311, "wf_mean_sharpe": 7.849,
+    "wf_folds_positive": 6, "n_trades_test": 280,
+    "model_file": "btc_dqn_policy_DISTILL_v8_seed123.pt", "trained_at": "2026-05-11",
+    "notes": "C2 distilled student, seed 123 (best test Sharpe)"
+  },
+  "DISTILL_v8_seed0": {
+    "ticker": "btc", "model_type": "distill", "tag": "DISTILL_v8_seed0", "seed": 0,
+    "algo": "supervised_ce", "hidden": 256, "state_version": "v8_s11s13",
+    "teacher": "VOTE5_v8_H256_DD", "loss": "masked_cross_entropy", "epochs": 12,
+    "ensemble_role": "DISTILL_v8_VOTE5_seed0",
+    "val_sharpe": 9.486, "test_sharpe": 6.197, "wf_mean_sharpe": 8.508,
+    "wf_folds_positive": 6, "n_trades_test": 268,
+    "model_file": "btc_dqn_policy_DISTILL_v8_seed0.pt", "trained_at": "2026-05-11",
+    "notes": "C2 distilled student, seed 0"
+  },
+  "DISTILL_v8_seed99": {
+    "ticker": "btc", "model_type": "distill", "tag": "DISTILL_v8_seed99", "seed": 99,
+    "algo": "supervised_ce", "hidden": 256, "state_version": "v8_s11s13",
+    "teacher": "VOTE5_v8_H256_DD", "loss": "masked_cross_entropy", "epochs": 12,
+    "ensemble_role": "DISTILL_v8_VOTE5_seed99",
+    "val_sharpe": 6.336, "test_sharpe": 5.546, "wf_mean_sharpe": 7.859,
+    "wf_folds_positive": 6, "n_trades_test": 274,
+    "model_file": "btc_dqn_policy_DISTILL_v8_seed99.pt", "trained_at": "2026-05-11",
+    "notes": "C2 distilled student, seed 99"
+  },
+  "DISTILL_v8_VOTE5": {
+    "ticker": "btc", "model_type": "ensemble", "tag": "DISTILL_v8_VOTE5",
+    "ensemble_mode": "plurality",
+    "members": ["DISTILL_v8_seed42", "DISTILL_v8_seed7", "DISTILL_v8_seed123",
+                "DISTILL_v8_seed0", "DISTILL_v8_seed99"],
+    "val_sharpe": 3.452, "test_sharpe": 3.976, "wf_mean_sharpe": 7.127,
+    "wf_folds_positive": 6, "n_trades_test": 272,
+    "trained_at": "2026-05-11",
+    "notes": "C2 — 5-seed plurality of distilled students. UNDERPERFORMS individual seeds because correlated students vote together (no diversity benefit). Single distilled net beats voting of distilled nets."
   }
 }
