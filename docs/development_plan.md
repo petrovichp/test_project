@@ -72,7 +72,7 @@ The right order is **Z3 standalone validation → Z2 cheap warm-up → Z2 strong
 
 | # | step | cost | gate | result reshapes |
 |---|---|---|---|---|
-| **1** | [Z3.1 standalone validation](#step-1) | ~1 h, **0 training** | none | Steps 4, 6 |
+| **1** ✅ | [Z3.1 standalone validation](#step-1) | DONE 2026-05-11 | — | **S11+S13 kept for Step 4 (unique signals); S5+S9 dropped (redundant)**. See [z3_step1_killed_strategies.md](z3_step1_killed_strategies.md). |
 | **2** | [Z2.4 price-action context](#step-2) | ~25 min train | none | Step 5 |
 | **3** | [Z2.2 perp basis + funding state](#step-3) | ~3-4 h | Step 2 pipeline works | Step 5 |
 | **4** | [Z3.1 wire & retrain](#step-4) | ~1 day | ≥2 strategies pass Step 1 | Step 6 |
@@ -99,10 +99,11 @@ The right order is **Z3 standalone validation → Z2 cheap warm-up → Z2 strong
 - The fee-aware retrain experiment ([fee_aware_retrain.md](fee_aware_retrain.md)) showed adding fee to reward but NOT state was suboptimal — a clue that important context belongs in state, not just in reward.
 - This is **the most theoretically-grounded Z2 candidate.**
 
-#### Step 4 — Z3.1 wire & retrain
-**What**: If ≥2 strategies pass Step 1, add their keys to `STRAT_KEYS`, add execution configs, regenerate state cache with expanded `signals` shape, train 5 H256+DD seeds at action space 11–14 → `VOTE5_v8_H256_DD`.
+#### Step 4 — Z3.1 wire & retrain (REVISED post Step 1)
+**What**: Step 1 showed S11_Basis + S13_OBDiv carry unique signal types (basis momentum, cross-instrument OB disagreement) not covered by current 9. S5 + S9 dropped (redundant with S8). Add S11 + S13 only → 10 → 12 actions. Train 5 H256+DD seeds → `VOTE5_v8_H256_DD`.
 **Decision**: keep if WF ≥ +11.55.
-**Proof of value**: gated on positive Step 1. If Step 1 finds signal, Step 4 is the deployment vehicle. The expanded action space gives the DQN more options to choose from on bars where the current 9 don't fire — direct trade-volume expansion (Sharpe ∝ √N).
+**Proof of value**: confirmed by Step 1. S11/S13 standalone Sharpes (−5.66 / −2.81 val) are no worse than currently-used S3 (−28) / S7 (−19.4), and S11 specifically covers basis-momentum which no current strategy uses. Direct test of the action-space-expansion hypothesis.
+**Cost**: 5 seeds × ~5 min train + ~5 min signal regen = ~30 min.
 
 #### Step 5 — Z2.5 combined state v7
 **What**: stack survivors of Steps 2+3 into one expanded state. Retrain 5 seeds. Eval.

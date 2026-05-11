@@ -1,5 +1,8 @@
 # Crypto Trading ML — Results & Conclusions
 
+> **Status (2026-05-11, post Z3 Step 1):**
+> - **Z3 Step 1 — DIAGNOSTIC** ([docs/z3_step1_killed_strategies.md](docs/z3_step1_killed_strategies.md)). Standalone-validated the 4 "killed" strategies (S5, S9, S11, S13). Actual Sharpes (val/test): S5 −5.15/−17.37, S9 −5.39/−11.72, S11 −5.66/−8.28, S13 −2.81/−2.81. The original "Sharpe < −20" comment is **outdated** — current values are in line with the worst currently-used strategies (S3 val −28, S7 val −19.4 are both DQN-active). **Verdict**: drop S5, S9 (redundant with S8 + already-captured signals). Keep S11 (basis momentum, unique signal) and S13 (cross-instrument OB, unique signal) for Step 4 retrain — expand action space from 10 → 12 actions.
+>
 > **Status (2026-05-10, post Phase Z1 — stack proven winners):**
 > - **Phase Z1 complete — `VOTE5_H256_DD` PROMOTED** ([docs/z1_results.md](docs/z1_results.md)). The H256+DD architectural stack (capacity + regularization) achieves **WF +11.05, test +9.01 (highest in project history), val +3.21, fold-6 +8.23, 6/6 folds positive.** Hypothesis confirmed: capacity (H256) preserves WF lift while DD's regularization recovers fold-6 from H256-alone's collapse to +0.41. Test +9.01 beats every prior baseline by wide margin. New candidate baseline pending Z5 validation.
 > - **Z1.2 K=10 vanilla — NEGATIVE** ([docs/z1_results.md](docs/z1_results.md)). VOTE10 plurality has more ways to tie than K=5 → trade count drops 1,122 → 965 (−14%) → Sharpe ∝ √N collapse. WF +9.65 (vs K=5 +10.40), val −0.53. Don't use K=10. K=5 is sweet spot.
