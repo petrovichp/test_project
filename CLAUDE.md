@@ -9,7 +9,8 @@
 @.claude/rules/git.md
 @.claude/rules/agent-workflow.md
 
-> **For the live development plan see [docs/development_plan.md](docs/development_plan.md). For results, status, and historical context see [RESULTS.md](RESULTS.md), [docs/baselines.md](docs/baselines.md), [docs/distill_vote5.md](docs/distill_vote5.md), [docs/cross_asset.md](docs/cross_asset.md), [docs/path_a_c1_results.md](docs/path_a_c1_results.md), [docs/z2_z3_results.md](docs/z2_z3_results.md), [docs/z1_results.md](docs/z1_results.md), [docs/voting_ensemble.md](docs/voting_ensemble.md), [docs/capacity_test.md](docs/capacity_test.md), [docs/trade_quality_by_agreement.md](docs/trade_quality_by_agreement.md), [docs/algo_test.md](docs/algo_test.md), [docs/baseline_vote5_audit.md](docs/baseline_vote5_audit.md), [docs/seed_variance.md](docs/seed_variance.md), [docs/ensemble_baseline.md](docs/ensemble_baseline.md), [docs/state_v6_test.md](docs/state_v6_test.md), [docs/experiments_log.md](docs/experiments_log.md), [docs/data_splits.md](docs/data_splits.md), [docs/a2_rule_audit.md](docs/a2_rule_audit.md), [docs/audit_followup_tests.md](docs/audit_followup_tests.md), [docs/fee_sensitivity_vote5.md](docs/fee_sensitivity_vote5.md), [docs/fee_aware_retrain.md](docs/fee_aware_retrain.md), [docs/fee_improvement_proposals.md](docs/fee_improvement_proposals.md).**
+> **Doc index: [docs/README.md](docs/README.md) — categorized list of all experiment docs.**
+> **For the live development plan see [docs/development_plan.md](docs/development_plan.md). For results, status, and historical context see [RESULTS.md](RESULTS.md) and [docs/baselines.md](docs/baselines.md).**
 > Latest findings (2026-05-11, post Path C2 + Z2.1):
 >
 > **Primary baseline (max WF)**: **`VOTE5_v8_H256_DD`** — h=256 Double_Dueling, 12-action space (S11+S13 added via Z3 Step 4), 5 seeds plurality vote, v8_s11s13 state. **WF +12.07, val +6.67, test +4.44, 6/6 folds positive.** Disjoint-pool validation (Path A3) shows val is partly seed-luck; realistic expectations WF ~+10.5, val ~+2-3.
@@ -84,7 +85,7 @@ backtest/
   run.py                    strategy backtest runner
 
 cache/       parquet, npz, .keras, .pt, .png  (gitignored)
-docs/        experiments_log.md, next_steps.md
+docs/        README.md (categorized index) + per-experiment docs
 RESULTS.md   top-level summary
 ```
 
