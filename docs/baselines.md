@@ -1,23 +1,48 @@
 # Baselines — reference systems for all future experiments
 
-> Refreshed 2026-05-11 after Phase Z3 Step 4: **`VOTE5_v8_H256_DD` is the new primary baseline** (12-action: S11_Basis + S13_OBDiv added). Reproducible end-to-end from the data files in `cache/` and the commands below. All future experiments report deltas vs `VOTE5_v8_H256_DD` (strongest) and may include the others for context.
+> Refreshed 2026-05-11 after Path C2 (distillation) + Z2.1 (cross-asset). **Primary baseline: `VOTE5_v8_H256_DD`** (max WF, max val, 6/6 folds). **Cheap-deployment alternative: `DISTILL_v8_seed42`** (single net, 5× cheaper inference, best test Sharpe of the BTC family). **Cross-asset extensions**: `VOTE5_v8_H256_DD_eth` and `_sol` for multi-asset deployment. Reproducible end-to-end from the data files in `cache/` and the commands below. All future experiments report deltas vs `VOTE5_v8_H256_DD` (strongest aggregate) and `DISTILL_v8_seed42` (strongest test).
 
-## Quick comparison
+## Quick comparison — BTC
 
-| Metric | ⭐ **VOTE5_v8_H256_DD** | **VOTE5_v7basis_H256_DD** | **VOTE5_H256_DD** | **VOTE5** | **VOTE5_H256** | **VOTE5_DD** |
-|---|---|---|---|---|---|---|
-| Type | h=256 + DD, **12-action** (S11/S13 added) | h=256 + DD, basis+funding state | h=256 + Double_Dueling | h=64 plurality | h=256 plurality | h=64 + DD plurality |
-| State version | v8_s11s13 (52-dim) | v7_basis (55-dim) | v5 (50-dim) | v5 | v5 | v5 |
-| Constituents | 5 seeds: 42,7,123,0,99 | same | same | same | same | same |
-| **Walk-forward mean Sharpe** | **+12.07** | +11.66 | +11.05 | +10.40 | +11.86 | +6.80 |
-| Walk-forward folds positive | **6/6** | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 |
-| Fold 6 Sharpe | +4.44 | +2.31 | **+8.23** | +5.20 | +0.41 | +4.58 |
-| DQN-val Sharpe | **+6.67** | +6.05 | +3.21 | +3.53 | +3.32 | +6.12 |
-| DQN-test Sharpe | +4.44 | +2.90 | **+9.01** | +4.19 | +1.21 | +5.91 |
-| Trades (full RL period) | 1,416 | 1,182 | 1,372 | 1,122 | — | 1,437 |
-| Profile | **best WF + best val + 6/6 folds** | val-robustness alternative | best test + fold-6 | balanced h=64 | aggregate WF (weak fold-6) | val regularization (h=64) |
+| Metric | ⭐ **VOTE5_v8_H256_DD** | ⭐ **DISTILL_v8_seed42** | **VOTE5_v7basis_H256_DD** | **VOTE5_H256_DD** | **VOTE5** | **VOTE5_H256** | **VOTE5_DD** |
+|---|---|---|---|---|---|---|---|
+| Type | h=256 + DD, **12-action** (S11/S13 added) | **single net** distilled from VOTE5_v8 | h=256 + DD, basis+funding state | h=256 + Double_Dueling | h=64 plurality | h=256 plurality | h=64 + DD plurality |
+| State version | v8_s11s13 (52-dim) | v8_s11s13 (52-dim) | v7_basis (55-dim) | v5 (50-dim) | v5 | v5 | v5 |
+| Constituents | 5 seeds: 42,7,123,0,99 | 1 seed (42, val-selected) | 5 seeds | same | same | same | same |
+| Inference cost | 5× forward | **1× forward** | 5× | 5× | 5× | 5× | 5× |
+| **Walk-forward mean Sharpe** | **+12.07** | +9.99 | +11.66 | +11.05 | +10.40 | +11.86 | +6.80 |
+| Walk-forward folds positive | **6/6** | **6/6** | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 |
+| Fold 6 Sharpe | +4.44 | — | +2.31 | **+8.23** | +5.20 | +0.41 | +4.58 |
+| DQN-val Sharpe | +6.67 | **+10.41** | +6.05 | +3.21 | +3.53 | +3.32 | +6.12 |
+| DQN-test Sharpe | +4.44 | **+9.35** | +2.90 | +9.01 | +4.19 | +1.21 | +5.91 |
+| Trades (full RL period) | 1,416 | 1,660 | 1,182 | 1,372 | 1,122 | — | 1,437 |
+| Profile | **best WF + best val + 6/6** | **best test + cheap inference** | val-robustness alternative | best fold-6 | balanced h=64 | aggregate WF (weak fold-6) | val regularization (h=64) |
 
 **All baselines beat BTC buy-and-hold on val (+7.2%) and test (+8.6%).**
+
+### Honest disclosure on `DISTILL_v8_seed42`
+
+Seed 42 was selected by **val Sharpe** from a 5-seed pool {42, 7, 123, 0, 99}. To check it is not seed-luck, we trained a disjoint pool {1, 13, 25, 50, 77} and ran walk-forward on the resulting 5 students:
+
+| pool | best single test | family mean WF | family mean val | family mean test |
+|---|---:|---:|---:|---:|
+| Original {42,7,123,0,99} | s=42 test **+9.35** | +8.30 | +8.30 | +7.85 |
+| Disjoint {1,13,25,50,77} | s=50 test **+9.86** | +8.06 | +8.54 | +6.70 |
+
+The disjoint pool reproduces the magnitude (best single test +9.86 vs +9.35). **Family-mean test ~+7.3** is the honest expected performance of a single distilled net selected by val Sharpe from any 5-seed pool. The headline +9.35 is the val-tuned best; the family floor is ~+5 (worst-seed test).
+
+## Quick comparison — Cross-asset (Z2.1, 2026-05-11)
+
+| Metric | **VOTE5_v8_H256_DD** (BTC) | **VOTE5_v8_H256_DD_eth** | **VOTE5_v8_H256_DD_sol** |
+|---|---:|---:|---:|
+| **Walk-forward mean Sharpe** | **+12.07** | +7.22 | +8.24 |
+| Walk-forward folds positive | 6/6 | 5/6 | 6/6 |
+| DQN-val Sharpe | +6.67 | +5.57 | +4.16 |
+| DQN-test Sharpe | +4.44 | −0.09 | +2.19 |
+| Trades (val/test) | 300 / 199 | 123 / 79 | 457 / 301 |
+| Per-seed greedy val (mean) | n/a | −11.9 | −13.1 |
+
+**Key finding**: per-seed greedy val Sharpes were *negative* on every cross-asset training run; plurality voting recovers a deployable policy via defensive trade-filtering. Test split is the soft spot — ETH essentially flat, SOL half BTC's. See [docs/cross_asset.md](cross_asset.md).
 
 ### Headline: VOTE5_v8_H256_DD
 
@@ -46,6 +71,66 @@ python3 -m models.eval_z2_z3
 ```
 
 Wall time: ~10 min total (1.5 min state build + 5 × ~2 min training).
+
+---
+
+### Cheap-deployment alternative: DISTILL_v8_seed42
+
+`DISTILL_v8_seed42` (Path C2, 2026-05-11) is a **single DuelingDQN** (52→256→128→12, 48k params) trained by masked cross-entropy to mimic the plurality vote of `VOTE5_v8_H256_DD`. It is the production option for cheap inference — one forward pass per decision instead of five — and **delivers the highest BTC test Sharpe (+9.35) of any single artifact in the project**, while losing ~2 points of WF mean Sharpe to the teacher (+9.99 vs +12.07).
+
+**Reproduction**:
+```bash
+# Precompute teacher labels (plurality vote of VOTE5_v8 over train/val/test)
+python3 -m models.distill_targets
+
+# Train 5 student seeds (each ~9s, masked CE + stratified 50/50 batches)
+for SEED in 42 7 123 0 99; do
+  python3 -m models.distill_vote5 --seed ${SEED} --tag DISTILL_v8
+done
+
+# Walk-forward + val/test eval, single nets and 5-seed ensemble
+python3 -m models.eval_distill_v8
+```
+
+**Key facts**:
+- Trained 100% supervised on teacher labels — no RL loop, no replay buffer.
+- Stratified batching (128 NO_TRADE + 128 trade per 256-batch) handles the 95/5 imbalance.
+- Best checkpoint by val Sharpe (12 epochs max). s=42 wins val from {42, 7, 123, 0, 99}.
+- Disjoint validation: trained {1, 13, 25, 50, 77}, family-mean test +6.70 (vs orig +7.85). Magnitude reproduces; s=42 not a lucky outlier.
+- **Voting distilled students underperforms** (DISTILL_v8 VOTE5 ensemble: WF +7.13, test +3.98) — same labels → correlated voters → no diversity benefit. Deploy a single distilled net, not a vote of them.
+
+Doc: [docs/distill_vote5.md](distill_vote5.md). Registry: `DISTILL_v8_seed42` (+ 5 disjoint variants).
+
+---
+
+### Cross-asset (ETH, SOL) — Z2.1
+
+`VOTE5_v8_H256_DD_eth` and `VOTE5_v8_H256_DD_sol` use the **identical** strategy stack and hyperparameters as the BTC primary, just trained on the respective ticker's data. Both yield positive walk-forward Sharpe at the ensemble level (ETH +7.22, SOL +8.24, 5/6 and 6/6 folds positive).
+
+**Reproduction (per ticker)**:
+```bash
+# Build pipeline for the new ticker (eth or sol)
+python3 -m features.assembly eth        # ~5 min (191 features)
+python3 -m models.vol_v4 eth            # ~5 sec  (LightGBM ATR-30)
+python3 -m models.regime_cusum_v4 eth   # ~1 sec
+python3 -m models.direction_dl_v4 eth   # ~5 min  (4 CNN-LSTMs)
+python3 -m models.dqn_state eth         # ~2 sec
+python3 -m models.build_state_v8 eth    # ~1 sec
+
+# Train 5 seeds
+for SEED in 42 7 123 0 99; do
+  python3 -m models.dqn_selector eth \
+    --tag VOTE5_v8_H256_DD_eth_seed${SEED} \
+    --state-version v8_s11s13 \
+    --hidden 256 --algo double_dueling \
+    --fee 0.0 --trade-penalty 0.001 --seed ${SEED}
+done
+
+# Eval all 3 tickers
+python3 -m models.eval_cross_asset
+```
+
+**Caveat**: per-seed greedy val Sharpe is negative on every cross-asset run (−6.8 to −16.3). Plurality voting is what makes the policy deployable. Not all assets recover cleanly on test (ETH test ≈ 0). Doc: [docs/cross_asset.md](cross_asset.md).
 
 ---
 
