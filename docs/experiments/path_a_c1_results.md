@@ -1,12 +1,12 @@
 # Path A (validation) + Path C1 (curriculum) — results
 
-Executed 2026-05-11 per [development_plan.md](development_plan.md) recommendation.
+Executed 2026-05-11 per [development_plan.md](../reference/development_plan.md) recommendation.
 
 ## Path A — validation of `VOTE5_v8_H256_DD` baseline
 
 ### A1 — Plot vs prior baselines
 
-[cache/plot_v8_vs_baselines.png](../cache/plot_v8_vs_baselines.png).
+[cache/plots/plot_v8_vs_baselines.png](../cache/plots/plot_v8_vs_baselines.png).
 
 | split | BASELINE_VOTE5 | VOTE5_H256_DD | **VOTE5_v8** ⭐ | BTC B&H |
 |---|---|---|---|---|

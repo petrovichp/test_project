@@ -1,6 +1,6 @@
 # Development Plan — zero-fee & non-zero-fee paths
 
-This is the live forward plan as of 2026-05-10. Supersedes [next_steps.md](next_steps.md) (kept for historical reference).
+This is the live forward plan as of 2026-05-10. Supersedes [next_steps.md](../archive/next_steps.md) (kept for historical reference).
 
 ## Current state — the bars to beat
 
@@ -39,14 +39,14 @@ Each axis has different evidence. The order of next steps follows the strength o
 ### Evidence per axis — what we already know
 
 **Z2 — More state information**: weak evidence base.
-- State v6 added direction probabilities (4 dims) → NEGATIVE result, WF dropped by 1.78 ([state_v6_test.md](state_v6_test.md)). But those 4 dims were already implicit in the binary signal flags — that's a *weak* negative, not a *general* one.
+- State v6 added direction probabilities (4 dims) → NEGATIVE result, WF dropped by 1.78 ([state_v6_test.md](../experiments/state_v6_test.md)). But those 4 dims were already implicit in the binary signal flags — that's a *weak* negative, not a *general* one.
 - We have features that exist in `cache/*_meta.parquet` but are NOT in the 50-dim state: cross-asset (ETH/SOL), perp-spot basis as raw, funding-rate dynamics, OB-depth percentiles. **These have never been tested.**
 - *Inference*: the bottleneck might be in *which* information is in state, not in *how much*. Worth testing.
 
 **Z3 — More actions**: stronger evidence base.
 - [strategy/agent.py](../strategy/agent.py) defines **13 strategies**, but only **9** are wired into the DQN action space. Strategies 5, 9, 11, 13 exist as code but the DQN has never seen them.
 - Strategy 11 specifically uses spot-perp basis (`diff_price` z-score) — a signal type completely absent from the current 9 strategies.
-- The A4 audit ([baseline_vote5_audit.md](baseline_vote5_audit.md)) showed S6 and S10 contributing *negatively* on test — the current action space is not optimally chosen, suggesting unused-code strategies could displace the weak ones.
+- The A4 audit ([baseline_vote5_audit.md](../audits/baseline_vote5_audit.md)) showed S6 and S10 contributing *negatively* on test — the current action space is not optimally chosen, suggesting unused-code strategies could displace the weak ones.
 - *Inference*: there is likely free alpha in the unused code. The cost to test is **zero training** — a standalone backtest confirms or rejects.
 
 **Z4 — Better learning**: positive evidence base, but expensive to test.
@@ -72,8 +72,8 @@ The right order is **Z3 standalone validation → Z2 cheap warm-up → Z2 strong
 
 | # | step | cost | gate | result reshapes |
 |---|---|---|---|---|
-| **1** ✅ | [Z3.1 standalone validation](#step-1) | DONE 2026-05-11 | — | S11+S13 kept; S5+S9 dropped. See [z3_step1_killed_strategies.md](z3_step1_killed_strategies.md). |
-| **2** ❌ | [Z2.4 price-action context](#step-2) | DONE 2026-05-11 | — | **NEGATIVE.** WF +9.18 vs baseline +11.05. Drop v7_pa. See [z2_z3_results.md](z2_z3_results.md). |
+| **1** ✅ | [Z3.1 standalone validation](#step-1) | DONE 2026-05-11 | — | S11+S13 kept; S5+S9 dropped. See [z3_step1_killed_strategies.md](../experiments/z3_step1_killed_strategies.md). |
+| **2** ❌ | [Z2.4 price-action context](#step-2) | DONE 2026-05-11 | — | **NEGATIVE.** WF +9.18 vs baseline +11.05. Drop v7_pa. See [z2_z3_results.md](../experiments/z2_z3_results.md). |
 | **3** 🟡 | [Z2.2 perp basis + funding state](#step-3) | DONE 2026-05-11 | — | **PARTIAL.** Val resilience confirmed (+3.46), but test/fold-6 regressed. Keep as alternative. |
 | **4** ✅ | [Z3.1 wire & retrain](#step-4) | DONE 2026-05-11 | — | **WIN. `VOTE5_v8_H256_DD` PROMOTED as new primary baseline. WF +12.07, val +6.67, 6/6 folds.** |
 | **5** 🟡 | [Z2.5 combined state v7](#step-5) | DONE 2026-05-11 | — | **NOT ADDITIVE.** WF +10.47 vs Step 4 +12.07. Feature overlap (basis in both state + S11 action). Retained as fold-6 alternative. |
@@ -152,7 +152,7 @@ BTC perpetual futures trade on leverage. Two macro indicators dominate the lever
 
 The current DQN sees `signals[k]` for `S2_Funding` (a binary fire/no-fire based on funding magnitude). It does NOT see the *raw* funding rate value, *direction* of funding change, basis dislocation Z-score, or open-interest dynamics. This is the analog of "you can see the strategy fired" without "you can see the underlying conditions that caused the fire."
 
-**The fee-aware retrain experiment ([fee_aware_retrain.md](fee_aware_retrain.md)) is direct evidence this matters**: adding fee to the reward (so the policy was *penalized* for it) but NOT to the state (so the policy couldn't *see* it) produced a policy that under-performed both vanilla VOTE5 + filter AND maker-only. The fix was clear: the policy needs to *see* the cost context, not just be punished for it. Same principle applies to funding/basis.
+**The fee-aware retrain experiment ([fee_aware_retrain.md](../experiments/fee_aware_retrain.md)) is direct evidence this matters**: adding fee to the reward (so the policy was *penalized* for it) but NOT to the state (so the policy couldn't *see* it) produced a policy that under-performed both vanilla VOTE5 + filter AND maker-only. The fix was clear: the policy needs to *see* the cost context, not just be punished for it. Same principle applies to funding/basis.
 
 **The 5 features**:
 
@@ -231,13 +231,13 @@ State vector grows: 50 → 55 dims.
 #### Step 6 — Z3.2 S15_VolBreakout
 **What**: Implement `strategy_14` with vol-ratio > 2.0 + 10-bar direction filter. Standalone-validate; if pass, expand action space again (12-15 actions including Step 4 survivors).
 **Decision**: keep if standalone passes AND retrained ensemble ≥ +11.55.
-**Proof of value**: this is the only truly-new strategy in the plan (no equivalent in existing 13). [Z3 feasibility check](z3_data_feasibility.md) showed `vol_ratio > 2.0` fires on ~6% of bars — non-trivial frequency, decent fire rate for a momentum continuation signal. None of S1-S13 fire on pure vol expansion.
+**Proof of value**: this is the only truly-new strategy in the plan (no equivalent in existing 13). [Z3 feasibility check](../experiments/z3_data_feasibility.md) showed `vol_ratio > 2.0` fires on ~6% of bars — non-trivial frequency, decent fire rate for a momentum continuation signal. None of S1-S13 fire on pure vol expansion.
 
 ### What we are NOT doing yet, and why
 
 - **Z4 (architecture experiments — transformer, distributional RL, self-distillation)** — not started. Each is 1-2 days of new code. Cost-benefit favors exhausting cheaper Z2/Z3 first. We have evidence (Z1 results) that this axis has headroom; we'll come back to it.
 - **Z5 (validation + freeze)** — gated; only runs once Z2/Z3/Z4 produce a winner clear enough to ship.
-- **Path F (non-zero-fee)** — parked per user direction. The 7-item plan in [fee_improvement_proposals.md](fee_improvement_proposals.md) resumes when zero-fee path saturates OR if maker-only execution (Path X) proves infeasible.
+- **Path F (non-zero-fee)** — parked per user direction. The 7-item plan in [fee_improvement_proposals.md](../proposals/fee_improvement_proposals.md) resumes when zero-fee path saturates OR if maker-only execution (Path X) proves infeasible.
 - **Path X (maker-only execution scoping)** — engineering, separate track, not in this research plan.
 
 ### Decision rules (every step)
@@ -274,9 +274,9 @@ The combined cost is ~7 days of work. If every step fails, we still own:
 
 | phase | status | notes |
 |---|---|---|
-| **Z1 — Stack proven winners** | ✅ **DONE 2026-05-10** | Winner: **`VOTE5_H256_DD`** (WF +11.05, test +9.01, fold-6 +8.23, 6/6 folds). See [z1_results.md](z1_results.md). |
+| **Z1 — Stack proven winners** | ✅ **DONE 2026-05-10** | Winner: **`VOTE5_H256_DD`** (WF +11.05, test +9.01, fold-6 +8.23, 6/6 folds). See [z1_results.md](../experiments/z1_results.md). |
 | **Z2 — Better state** | 🔵 **NEXT** | Steps 2, 3, 5 above. Baseline: `VOTE5_H256_DD`. |
-| **Z3 — Better signals** | 🟡 PRE-SCOPED | Steps 1 (validation) + 4 (retrain) + 6 (S15). [feasibility check](z3_data_feasibility.md) compressed plan. |
+| **Z3 — Better signals** | 🟡 PRE-SCOPED | Steps 1 (validation) + 4 (retrain) + 6 (S15). [feasibility check](../experiments/z3_data_feasibility.md) compressed plan. |
 | Z4 — Architecture & training | ⚪ NOT STARTED | gated; defer until Z2/Z3 exhausted |
 | Z5 — Validation & freeze | ⚪ NOT STARTED | gated on Z1–Z4 winner |
 | Path F (non-zero-fee) | ⚫ PARKED | resume after Path Z winner OR if maker-only fails |
@@ -293,7 +293,7 @@ The combined cost is ~7 days of work. If every step fails, we still own:
 
 Goal: lift WF mean Sharpe meaningfully above +10.40 (vanilla VOTE5) or +11.86 (H256), while preserving 6/6 fold positivity and improving fold-6 robustness.
 
-The zero-fee assumption corresponds to maker-only execution. Per [docs/fee_improvement_proposals.md](fee_improvement_proposals.md) #1, this is unblocked by Path X (maker-only scoping) which is engineering work, not research — separate track.
+The zero-fee assumption corresponds to maker-only execution. Per [docs/proposals/fee_improvement_proposals.md](../proposals/fee_improvement_proposals.md) #1, this is unblocked by Path X (maker-only scoping) which is engineering work, not research — separate track.
 
 ## Phase Z1 — Stack the proven winners (low-risk)
 
@@ -552,7 +552,7 @@ state[53] = vol_ratio_30_60                (ATR_30 / ATR_60)
 
 ## Phase Z3 — Better signals (medium-risk)
 
-> **Plan compressed 2026-05-10 after data feasibility check.** [docs/z3_data_feasibility.md](z3_data_feasibility.md) revealed that `strategy/agent.py` already defines **13** strategies but only 9 are wired into the DQN action space. The 4 unused strategies (S5, S9, S11, S13) overlap with the originally-proposed S14+S16. S2_Funding (already wired in) covers my originally-proposed S13_FundingExtreme. Net result: the original 4-strategy plan compresses to **2 work items**. Original proposal preserved below as historical context.
+> **Plan compressed 2026-05-10 after data feasibility check.** [docs/experiments/z3_data_feasibility.md](../experiments/z3_data_feasibility.md) revealed that `strategy/agent.py` already defines **13** strategies but only 9 are wired into the DQN action space. The 4 unused strategies (S5, S9, S11, S13) overlap with the originally-proposed S14+S16. S2_Funding (already wired in) covers my originally-proposed S13_FundingExtreme. Net result: the original 4-strategy plan compresses to **2 work items**. Original proposal preserved below as historical context.
 
 | ID | Action | Cost | Why |
 |---|---|---|---|
@@ -742,7 +742,7 @@ If 2+ strategies clear standalone-validation gates, retrain `VOTE5_v8` with acti
 **Files to create**:
 - `models/distill_vote5.py` — training loop with combined loss
 - `cache/btc_dqn_distill_targets.npz` — cached teacher actions+distributions
-- `docs/distill_vote5.md` — results doc
+- `docs/experiments/distill_vote5.md` — results doc
 
 #### Z4.2 — Transformer block on state
 
@@ -852,7 +852,7 @@ Z5 is **gate-keeping**, not exploratory. After Z1–Z4 produce a winning policy,
 | Z5.1 | **Out-of-distribution stress test**: run final policy on Apr-May 2026 data not yet used | Locked test only used once; this is the second OOD check |
 | Z5.2 | **Seed variance ±2σ check** with 10 seeds | Confirm ensemble Sharpe range is wholly above +10.40, not borderline |
 | Z5.3 | **Fee-curve at non-zero fees** for the new winner | Even though path is zero-fee-targeted, the fee curve tells us robustness margin |
-| Z5.4 | **Freeze new baseline** in `docs/baselines.md` + tag in registry | Reproducibility requirement |
+| Z5.4 | **Freeze new baseline** in `docs/reference/baselines.md` + tag in registry | Reproducibility requirement |
 
 ### Z5 detailed sub-plan
 
@@ -869,7 +869,7 @@ Z5 is **gate-keeping**, not exploratory. After Z1–Z4 produce a winning policy,
 
 **Code touchpoints**:
 - New script `models/eval_ood_lock.py` that loads policy + OOD slice + computes single-shot metrics.
-- New cache file `cache/btc_dqn_state_ood_lock.npz` for the OOD state arrays.
+- New cache file `cache/state/btc_dqn_state_ood_lock.npz` for the OOD state arrays.
 
 **Risks**:
 - May not have enough OOD data on hand. Pulling fresh data is a separate engineering task (~1 day).
@@ -914,7 +914,7 @@ Z5 is **gate-keeping**, not exploratory. After Z1–Z4 produce a winning policy,
 
 **Method**:
 1. Add policy entry to `model_registry.json` per [`.claude/rules/model-registry.md`](../.claude/rules/model-registry.md). Include all eval results from Z5.1-Z5.3.
-2. Add the policy to [docs/baselines.md](baselines.md) with full reproduction spec (training command, seed list, hyperparameters, eval results).
+2. Add the policy to [docs/reference/baselines.md](baselines.md) with full reproduction spec (training command, seed list, hyperparameters, eval results).
 3. Update [RESULTS.md](../RESULTS.md) status block with the new frozen baseline as the headline.
 4. Update this development plan: mark Z1–Z5 phases as DONE in the execution-status table; record the frozen baseline tag.
 5. Tag the git commit as `baseline-{name}-frozen-YYYY-MM-DD` for fast retrieval.
@@ -934,7 +934,7 @@ Z5.1, Z5.2, Z5.3 can run in parallel (independent computations). Z5.4 must run l
 
 **Status**: deferred per user direction 2026-05-09. Resume after Path Z reaches a clear winner OR if maker-only execution (Path X) is found infeasible.
 
-Full prioritized plan in [docs/fee_improvement_proposals.md](fee_improvement_proposals.md). Summary order when work resumes:
+Full prioritized plan in [docs/proposals/fee_improvement_proposals.md](../proposals/fee_improvement_proposals.md). Summary order when work resumes:
 
 | # | Phase | Experiments | Cost |
 |---|---|---|---|
@@ -945,7 +945,7 @@ Full prioritized plan in [docs/fee_improvement_proposals.md](fee_improvement_pro
 
 **Hard ceiling**: per the fee analysis, even the best filter at 4.5 bp gives WF +3.72 vs +10.40 zero-fee. Everything F1–F4 is bounded above by that ceiling unless F2 (maker-only) breaks it.
 
-### Path F detailed sub-plan (high-level — full plan in [fee_improvement_proposals.md](fee_improvement_proposals.md))
+### Path F detailed sub-plan (high-level — full plan in [fee_improvement_proposals.md](../proposals/fee_improvement_proposals.md))
 
 #### F1 — Cheap post-hoc improvements (highest cost-benefit)
 
@@ -1059,5 +1059,5 @@ Path X (maker scoping) done?
 Per [`.claude/rules/experiments.md`](../.claude/rules/experiments.md) and [`.claude/rules/model-registry.md`](../.claude/rules/model-registry.md):
 
 1. Every experiment in this plan generates a `docs/{experiment_name}.md` doc, a registry entry per trained model, and a `RESULTS.md` status-block update — all in one commit.
-2. Update **this plan** (`docs/development_plan.md`) when an experiment completes: mark done, record headline metric, link to its doc.
+2. Update **this plan** (`docs/reference/development_plan.md`) when an experiment completes: mark done, record headline metric, link to its doc.
 3. If a phase's decision gate fails, document the failure and the path divergence here before moving on.

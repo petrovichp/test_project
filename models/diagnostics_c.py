@@ -153,7 +153,7 @@ def run(ticker: str = "btc"):
     print(f"\n{'='*78}\n  PATH 1c — 5-MIN TIMEFRAME DIAGNOSTIC  ({ticker.upper()})\n{'='*78}")
 
     # ── load 1-min source ────────────────────────────────────────────────────
-    pq_1   = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq_1   = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     meta_1 = load_meta(ticker)
     assert (pq_1["timestamp"].values == meta_1["timestamp"].values).all()
     print(f"  1-min bars: {len(pq_1):,}")
@@ -196,7 +196,7 @@ def run(ticker: str = "btc"):
     print(f"\n  Subsampling direction preds (every 5th value) — approximate ...")
     dir_5 = {}
     for col in ["up_60", "down_60", "up_100", "down_100"]:
-        d_full = np.load(CACHE / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]   # length 383174 (post-warmup)
+        d_full = np.load(CACHE / "preds" / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]   # length 383174 (post-warmup)
         # full 1-min array length = len(pq_1) - 1440
         # we need 5-min predictions aligned with pq_5 (which spans full series w/ subsample)
         # pq_5 row i corresponds to pq_1 row i*5. dir preds are aligned to pq_1 from row 1440 onward.
@@ -282,7 +282,7 @@ def run(ticker: str = "btc"):
                 ))
 
     df = pd.DataFrame(rows)
-    df.to_parquet(CACHE / f"{ticker}_diag_1c_5min.parquet", index=False)
+    df.to_parquet(CACHE / "lookup" / f"{ticker}_diag_1c_5min.parquet", index=False)
 
     # ── summary tables ──────────────────────────────────────────────────────
     print(f"\n\n{'='*78}\n  5-MIN WALK-FORWARD — Sharpe per fold\n{'='*78}")

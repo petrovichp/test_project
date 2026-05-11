@@ -23,7 +23,7 @@ def load_teachers():
     for s in SEEDS:
         net = DuelingDQN(52, 12, 256)
         net.load_state_dict(torch.load(
-            CACHE / f"btc_dqn_policy_VOTE5_v8_H256_DD_seed{s}.pt", map_location="cpu"))
+            CACHE / "policies" / f"btc_dqn_policy_VOTE5_v8_H256_DD_seed{s}.pt", map_location="cpu"))
         net.eval()
         nets.append(net)
     return nets
@@ -45,7 +45,7 @@ def main():
     print(f"  loaded {len(nets)} teacher nets (DuelingDQN 52→256→128→12)")
 
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"btc_dqn_state_{split}{STATE_SUFFIX}.npz")
+        sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}{STATE_SUFFIX}.npz")
         s = torch.from_numpy(sp["state"]).float()
         v = torch.from_numpy(sp["valid_actions"]).bool()
         # ensure NO_TRADE always valid
@@ -77,7 +77,7 @@ def main():
             qs /= len(nets)
             q_mean = qs.numpy().astype(np.float32)
 
-        out = CACHE / f"btc_distill_targets_{split}_v8.npz"
+        out = CACHE / "distill" / f"btc_distill_targets_{split}_v8.npz"
         np.savez(out, action=actions, votes_count=votes_count, q_mean=q_mean)
 
         counts = Counter(actions.tolist())

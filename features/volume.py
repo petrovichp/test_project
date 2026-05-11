@@ -19,7 +19,7 @@ CACHE_DIR = Path(__file__).parent.parent / "cache"
 
 
 def compute(ticker: str, force: bool = False) -> pd.DataFrame:
-    out = CACHE_DIR / f"{ticker}_features_volume.parquet"
+    out = CACHE_DIR / "features" / f"{ticker}_features_volume.parquet"
     if out.exists() and not force:
         print(f"Loading volume features from cache: {out.name}")
         return pd.read_parquet(out)

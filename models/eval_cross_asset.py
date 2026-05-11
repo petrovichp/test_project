@@ -24,7 +24,7 @@ def load_net(ticker: str, seed: int) -> DuelingDQN:
     net = DuelingDQN(52, 12, 256)
     tag = f"VOTE5_v8_H256_DD" if ticker == "btc" else f"VOTE5_v8_H256_DD_{ticker}"
     net.load_state_dict(torch.load(
-        CACHE / f"{ticker}_dqn_policy_{tag}_seed{seed}.pt", map_location="cpu"))
+        CACHE / "policies" / f"{ticker}_dqn_policy_{tag}_seed{seed}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -32,14 +32,14 @@ def load_net(ticker: str, seed: int) -> DuelingDQN:
 def load_full(ticker: str):
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"{ticker}_dqn_state_{split}_v8_s11s13.npz")
+        sp = np.load(CACHE / "state" / f"{ticker}_dqn_state_{split}_v8_s11s13.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr", "ts", "regime_id"):
             arrs.setdefault(key, []).append(sp[key])
     return {k: np.concatenate(arrs[k], axis=0) for k in arrs}
 
 
 def eval_ticker(ticker: str):
-    vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     nets = [load_net(ticker, s) for s in SEEDS]
@@ -71,8 +71,8 @@ def eval_ticker(ticker: str):
     pos = sum(1 for r in rows if r["sharpe"] > 0)
 
     # val + test single-shot
-    sp_v = np.load(CACHE / f"{ticker}_dqn_state_val_v8_s11s13.npz")
-    sp_t = np.load(CACHE / f"{ticker}_dqn_state_test_v8_s11s13.npz")
+    sp_v = np.load(CACHE / "state" / f"{ticker}_dqn_state_val_v8_s11s13.npz")
+    sp_t = np.load(CACHE / "state" / f"{ticker}_dqn_state_test_v8_s11s13.npz")
     tp_v, sl_v, tr_v, tab_v, be_v, ts_v = _build_exit_arrays(sp_v["price"], sp_v["atr"], atr_median)
     tp_t, sl_t, tr_t, tab_t, be_t, ts_t = _build_exit_arrays(sp_t["price"], sp_t["atr"], atr_median)
     _, vsh, veq, vtr = run_fold(sp_v["state"], sp_v["valid_actions"], sp_v["signals"],
@@ -112,7 +112,7 @@ def main():
         print(f"  {r['ticker']:<6} {r['wf']:>+9.3f} {r['val']:>+9.3f} {r['test']:>+9.3f} "
               f"{r['wf_pos']:>4}/6  {r['val_trades']:>7} {r['test_trades']:>8}")
 
-    out = CACHE / "cross_asset_eval.json"
+    out = CACHE / "results" / "cross_asset_eval.json"
     out.write_text(json.dumps(out_rows, indent=2, default=str))
     print(f"\n  → {out.name}    [{time.perf_counter()-t0:.1f}s]")
 

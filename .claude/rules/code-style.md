@@ -31,3 +31,12 @@
 ## Reuse
 
 - Before writing new evaluation logic, check `models/audit_vote5_dd.py`, `models/voting_ensemble.py`, and `models/dqn_rollout.py` for `_simulate_one_trade_fee`, `_build_exit_arrays`, `run_fold`, `run_walkforward`. These are the canonical primitives.
+
+## Cache paths
+
+- New code reads / writes via `config.cache_paths` rather than hardcoding subfolder names:
+  ```python
+  from config.cache_paths import POLICIES, STATE, PREDS, FEATURES, RAW, DISTILL, RESULTS, PLOTS, LOOKUP
+  from config.cache_paths import policy_path, state_path, pred_vol_path  # typed helpers
+  ```
+- Existing scripts use `CACHE / "policies" / f"..."` literals — keep that style when editing a script that already uses it (don't half-migrate). New scripts should import from `config.cache_paths`.

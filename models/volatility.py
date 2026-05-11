@@ -53,7 +53,7 @@ def _model_code(ticker: str, target: str, horizon: int) -> str:
 
 
 def _model_path(code: str) -> Path:
-    return CACHE_DIR / f"{code}.txt"
+    return CACHE_DIR / "preds" / f"{code}.txt"
 
 
 # ── label computation ─────────────────────────────────────────────────────────
@@ -177,8 +177,8 @@ def _walk_forward(X_all, y_full, ts_clean, code: str):
         ytr = y_full[fold.train][ok_tr]
         yte = y_full[fold.test][ok_te]
         m   = _train_lgbm(Xtr, ytr, Xte, yte,
-                          CACHE_DIR / f"_wf_tmp_{fold.fold_idx}.txt")
-        (CACHE_DIR / f"_wf_tmp_{fold.fold_idx}.txt").unlink(missing_ok=True)
+                          CACHE_DIR / "preds" / f"_wf_tmp_{fold.fold_idx}.txt")
+        (CACHE_DIR / "preds" / f"_wf_tmp_{fold.fold_idx}.txt").unlink(missing_ok=True)
         corr    = spearmanr(m.predict(Xte), yte).statistic
         dir_acc = np.mean((m.predict(Xte) > np.percentile(yte, 66.7)) ==
                           (yte > np.percentile(yte, 66.7)))
@@ -218,7 +218,7 @@ def run(ticker: str = "btc", horizons: list[int] = None,
         return all_tgt[col][np.array([ts_map[t] for t in ts_arr])]
 
     # full clean matrix for walk-forward
-    assembled = pd.read_parquet(CACHE_DIR / f"{ticker}_features_assembled.parquet")
+    assembled = pd.read_parquet(CACHE_DIR / "features" / f"{ticker}_features_assembled.parquet")
     fc_all    = [c for c in assembled.columns if c != "timestamp"]
     from data.gaps import clean_mask as _cmask
     gap_ok    = _cmask(pd.Series(meta["timestamp"].values), max_lookback=1440)

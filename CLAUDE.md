@@ -10,14 +10,14 @@
 @.claude/rules/agent-workflow.md
 
 > **Doc index: [docs/README.md](docs/README.md) — categorized list of all experiment docs.**
-> **For the live development plan see [docs/development_plan.md](docs/development_plan.md). For results, status, and historical context see [RESULTS.md](RESULTS.md) and [docs/baselines.md](docs/baselines.md).**
+> **For the live development plan see [docs/reference/development_plan.md](docs/reference/development_plan.md). For results, status, and historical context see [RESULTS.md](RESULTS.md) and [docs/reference/baselines.md](docs/reference/baselines.md).**
 > Latest findings (2026-05-11, post Path C2 + Z2.1):
 >
 > **Primary baseline (max WF)**: **`VOTE5_v8_H256_DD`** — h=256 Double_Dueling, 12-action space (S11+S13 added via Z3 Step 4), 5 seeds plurality vote, v8_s11s13 state. **WF +12.07, val +6.67, test +4.44, 6/6 folds positive.** Disjoint-pool validation (Path A3) shows val is partly seed-luck; realistic expectations WF ~+10.5, val ~+2-3.
 >
-> **Cheap-deployment alternative**: **`DISTILL_v8_seed42`** — single DuelingDQN(52,12,256), 48k params, trained via masked CE on VOTE5_v8 plurality labels. **WF +9.99, val +10.41, test +9.35 (highest test in project history), 6/6 folds.** 5× cheaper inference than teacher. Disjoint-pool validation reproduces (s=50: test +9.86); family-mean test ~+7.3 is the honest expected. Voting distilled students *hurts* (same labels → correlated voters); deploy a single net, not a vote. See [docs/distill_vote5.md](docs/distill_vote5.md).
+> **Cheap-deployment alternative**: **`DISTILL_v8_seed42`** — single DuelingDQN(52,12,256), 48k params, trained via masked CE on VOTE5_v8 plurality labels. **WF +9.99, val +10.41, test +9.35 (highest test in project history), 6/6 folds.** 5× cheaper inference than teacher. Disjoint-pool validation reproduces (s=50: test +9.86); family-mean test ~+7.3 is the honest expected. Voting distilled students *hurts* (same labels → correlated voters); deploy a single net, not a vote. See [docs/experiments/distill_vote5.md](docs/experiments/distill_vote5.md).
 >
-> **Cross-asset (Z2.1)**: identical stack on ETH (WF +7.22, val +5.57, test −0.09, 5/6 folds) and SOL (WF +8.24, val +4.16, test +2.19, 6/6 folds). Per-seed greedy val is negative on every cross-asset run — plurality vote is what salvages a deployable policy. Multi-asset deployment viable at ~50-60% of BTC per-asset Sharpe. See [docs/cross_asset.md](docs/cross_asset.md).
+> **Cross-asset (Z2.1)**: identical stack on ETH (WF +7.22, val +5.57, test −0.09, 5/6 folds) and SOL (WF +8.24, val +4.16, test +2.19, 6/6 folds). Per-seed greedy val is negative on every cross-asset run — plurality vote is what salvages a deployable policy. Multi-asset deployment viable at ~50-60% of BTC per-asset Sharpe. See [docs/experiments/cross_asset.md](docs/experiments/cross_asset.md).
 >
 > **Prior context**: Phase Z1 winner `VOTE5_H256_DD` (test +9.01 was project record before C2 broke it). H256 capacity + DD regularization composes as hypothesized. `BASELINE_VOTE5_H128` exposed as seed-luck (dropped). K=10 plurality doesn't help (more ties → Sharpe ∝ √N collapse). Plurality voting is structurally beneficial; Q-averaging produces "third action" drift on regime-disagreement bars (abandoned). DQN exit-timing variants (B/C/B5/C2) don't beat rule-based exits in walk-forward. Path Z3 Step 5 (combining v8 + v7_basis state) did not compose (feature overlap). Path Z4.3 curriculum learning was NEGATIVE (regime gating biases buffer). Production path: Path X (maker-only execution) → live with rule-based exits using `DISTILL_v8_seed42` for cheap inference or `VOTE5_v8_H256_DD` for max WF.
 
@@ -31,10 +31,10 @@ Research-first ML system for crypto trading on OKX (BTC/ETH/SOL, 1-minute bars).
 
 | File | Rows | Description |
 |---|---|---|
-| `cache/okx_btcusdt_spotpepr_20260425_meta.parquet` | 384k | 29 market/microstructure columns |
-| `cache/okx_btcusdt_spotpepr_20260425_ob.parquet` | 384k | 800 OB amount columns + timestamp |
-| `cache/okx_ethusdt_spotpepr_20260425_meta.parquet` | — | ETH (same schema) |
-| `cache/okx_solusdt_spotpepr_20260425_meta.parquet` | — | SOL (same schema) |
+| `cache/raw/okx_btcusdt_spotpepr_20260425_meta.parquet` | 384k | 29 market/microstructure columns |
+| `cache/raw/okx_btcusdt_spotpepr_20260425_ob.parquet` | 384k | 800 OB amount columns + timestamp |
+| `cache/raw/okx_ethusdt_spotpepr_20260425_meta.parquet` | — | ETH (same schema) |
+| `cache/raw/okx_solusdt_spotpepr_20260425_meta.parquet` | — | SOL (same schema) |
 
 Meta columns: `timestamp, oi_usd, fund_rate, spot_ask_price, spot_bid_price, perp_ask_price, perp_bid_price, span_spot_price, span_perp_price, spot_minute_volume, perp_minute_volume, spot_sell_buy_side_deals, perp_sell_buy_side_deals, spot_spread_bps, spot_imbalance, spot_bid_concentration, spot_ask_concentration, spot_large_bid_count, spot_large_ask_count, perp_spread_bps, perp_imbalance, perp_bid_concentration, perp_ask_concentration, perp_large_bid_count, perp_large_ask_count, taker_sell_buy_ratio, taker_sell, taker_buy, diff_price`
 
@@ -84,8 +84,8 @@ backtest/
   preds.py                  cached vol + direction predictions
   run.py                    strategy backtest runner
 
-cache/       parquet, npz, .keras, .pt, .png  (gitignored)
-docs/        README.md (categorized index) + per-experiment docs
+cache/       parquet, npz, .keras, .pt, .png  (gitignored; see cache/README.md)
+docs/        README.md (index) + reference/ + experiments/ + audits/ + proposals/ + archive/
 RESULTS.md   top-level summary
 ```
 

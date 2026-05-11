@@ -5,7 +5,7 @@ Companion to [a2_rule_audit.md](a2_rule_audit.md). The audit surfaced 5 observat
 **Baseline**: A2 + rule-based exits, walk-forward across 6 RL folds at fee=0
 - **Mean Sharpe +9.034, median +8.865, 6/6 folds positive**
 - Per-fold equity 1.07× to 2.23× over ~32-day windows
-- Per-fold details: see [data_splits.md](data_splits.md) for fold boundaries
+- Per-fold details: see [data_splits.md](../reference/data_splits.md) for fold boundaries
 
 All 5 tests run **independently against this baseline**. Decision criterion per test in plan; outcome decisions below.
 
@@ -271,13 +271,13 @@ Final tally: **6 audit hypotheses × 9 variants tested → 0 winners.**
 | [models/group_c2_walkforward.py](../models/group_c2_walkforward.py) | extended with `--ablate-actions`, `--tp-scale`, `--out-tag`, `--no-b5` flags |
 | [models/dqn_selector.py](../models/dqn_selector.py) | `evaluate_policy` extended to also return per-trade `trade_dirs`, `trade_strats`; eq_arr last-bar fix |
 | [models/test5_long_bias.py](../models/test5_long_bias.py) | Test 5 module with two parts (diagnostic + synthetic inversion) |
-| `cache/btc_groupC2_walkforward_verify_baseline.json` | baseline reproduction (mean +9.034) |
+| `cache/results/btc_groupC2_walkforward_verify_baseline.json` | baseline reproduction (mean +9.034) |
 | `cache/btc_groupC2_walkforward_test{1..3}_ablate_*.json` | ablation tests |
 | `cache/btc_groupC2_walkforward_test4{a,b}_tp*.json` | TP tightening tests |
-| `cache/test5_inversion_results.json` | synthetic inversion per-fold details |
+| `cache/results/test5_inversion_results.json` | synthetic inversion per-fold details |
 | `cache/test5_btc_vs_sharpe.png` | scatter plot of BTC return vs A2 Sharpe |
 | `cache/btc_dqn_policy_A2_no_{s6,s7,s10}.pt` | retrained ablation policies (Test 6) |
 | `cache/btc_dqn_train_history_A2_no_{s6,s7,s10}.json` | retraining histories |
 | `cache/btc_groupC2_walkforward_retrain_no_{s6,s7,s10}.json` | retrain walk-forward results |
-| `cache/btc_dqn_policy_A2_no_s6_s7_s10.pt` | triple-ablation policy (Test 6b) |
+| `cache/policies/btc_dqn_policy_A2_no_s6_s7_s10.pt` | triple-ablation policy (Test 6b) |
 | `cache/btc_groupC2_walkforward_retrain_no_s6_s7_s10.json` | triple-ablation walk-forward result |

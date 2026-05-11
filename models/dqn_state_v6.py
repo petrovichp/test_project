@@ -8,7 +8,7 @@ New dims (50–53):
     53  p_dn_100 centered:  2 * (P_dn_100  − 0.5)
 
 All other dims (0–49) are identical to v5. The 4 CNN-LSTM probabilities (AUC
-0.64–0.70 OOS per docs/experiments_log.md) are computed and cached but never
+0.64–0.70 OOS per docs/reference/experiments_log.md) are computed and cached but never
 exposed to the DQN in v5; this version exposes them directly.
 
 Output: cache/btc_dqn_state_{train,val,test}_v6.npz — same schema as v5 but
@@ -32,7 +32,7 @@ def run(ticker: str = "btc"):
     # ── load v5 cached state files ───────────────────────────────────────────
     splits = {}
     for split in ("train", "val", "test"):
-        p = CACHE / f"{ticker}_dqn_state_{split}.npz"
+        p = CACHE / "state" / f"{ticker}_dqn_state_{split}.npz"
         if not p.exists():
             print(f"  ! missing {p.name} — run models.dqn_state first"); return
         splits[split] = dict(np.load(p))
@@ -42,7 +42,7 @@ def run(ticker: str = "btc"):
     print(f"\n  loading direction predictions (full bars) ...")
     dir_full = {}
     for col in ("up_60", "down_60", "up_100", "down_100"):
-        d = np.load(CACHE / f"{ticker}_pred_dir_{col}_v4.npz")
+        d = np.load(CACHE / "preds" / f"{ticker}_pred_dir_{col}_v4.npz")
         a = d["preds"].astype(np.float32)
         if np.isnan(a).any():
             import pandas as pd
@@ -83,7 +83,7 @@ def run(ticker: str = "btc"):
         new_state = np.concatenate([sp["state"], new_dims], axis=1)   # (n, 54)
         assert new_state.shape == (n, 54)
 
-        out_path = CACHE / f"{ticker}_dqn_state_{split}_v6.npz"
+        out_path = CACHE / "state" / f"{ticker}_dqn_state_{split}_v6.npz"
         np.savez(
             out_path,
             state         = new_state,

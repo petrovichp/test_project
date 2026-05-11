@@ -164,7 +164,7 @@ def evaluate_with_policy(policy: Callable, state, valid, signals, prices,
 
 def load_net(tag: str) -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -172,14 +172,14 @@ def load_net(tag: str) -> DQN:
 def load_full_rl_period(ticker: str = "btc"):
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"{ticker}_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"{ticker}_dqn_state_{split}.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr", "ts"):
             arrs.setdefault(key, []).append(sp[key])
     return {k: np.concatenate(arrs[k], axis=0) for k in arrs}
 
 
 def eval_split(policy: Callable, split: str, atr_median: float):
-    sp = np.load(CACHE / f"btc_dqn_state_{split}.npz")
+    sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
     tp, sl, tr, tab, be, ts = _build_exit_arrays(sp["price"], sp["atr"], atr_median)
     out = evaluate_with_policy(policy, sp["state"], sp["valid_actions"],
                                  sp["signals"], sp["price"], tp, sl, tr, tab, be, ts)
@@ -249,14 +249,14 @@ _TAG_FOR  = {s: ("BASELINE_FULL" if s == 42 else f"BASELINE_FULL_seed{s}")
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     full = load_full_rl_period("btc")
 
     print(f"\n{'='*120}\n  VOTING ENSEMBLE — K=5 + K=10 across multiple aggregation modes\n{'='*120}")
 
     # check policies exist
-    missing = [s for s in SEEDS_K10 if not (CACHE / f"btc_dqn_policy_{_TAG_FOR[s]}.pt").exists()]
+    missing = [s for s in SEEDS_K10 if not (CACHE / "policies" / f"btc_dqn_policy_{_TAG_FOR[s]}.pt").exists()]
     if missing:
         print(f"  ! missing policy files for seeds {missing} — skipping K=10 variants")
         K10 = []
@@ -316,7 +316,7 @@ def main():
     print(f"\n  Reference single-seed (BASELINE_FULL = seed=42):")
     print(f"    val=+7.295  test=+3.666  WF=+9.034 (6/6)  per-fold [13.03, 14.82, 6.29, 9.56, 8.17, 2.33]")
 
-    out = CACHE / "voting_ensemble_results.json"
+    out = CACHE / "results" / "voting_ensemble_results.json"
     out.write_text(json.dumps(results, indent=2, default=str))
     print(f"\n  → {out.name}    [{time.perf_counter()-t0:.1f}s]")
 

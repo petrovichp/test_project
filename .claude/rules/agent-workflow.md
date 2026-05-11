@@ -22,7 +22,7 @@ How Claude should operate on this project.
 
 ## Reporting results
 
-- Use the table format that matches existing docs (`docs/fee_aware_retrain.md`, `docs/voting_ensemble.md`).
+- Use the table format that matches existing docs (`docs/experiments/fee_aware_retrain.md`, `docs/experiments/voting_ensemble.md`).
 - Per-fold breakdown alongside aggregate.
 - Always quote the baseline number in the same line where you quote the new result.
 

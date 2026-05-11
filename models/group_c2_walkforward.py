@@ -108,7 +108,7 @@ def _restore_exec_config_tp(saved: dict):
 
 def _load_a2_policy(ticker: str = "btc", policy_tag: str = "A2") -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"{ticker}_dqn_policy_{policy_tag}.pt",
+    net.load_state_dict(torch.load(CACHE / "policies" / f"{ticker}_dqn_policy_{policy_tag}.pt",
                                      map_location="cpu"))
     net.eval()
     return net
@@ -117,7 +117,7 @@ def _load_a2_policy(ticker: str = "btc", policy_tag: str = "A2") -> DQN:
 def _load_b5_policies(ticker: str, N: int = 240) -> list:
     nets = []
     for k in range(len(STRAT_KEYS)):
-        path = CACHE / f"{ticker}_exit_dqn_fixed_policy_B5_fix{N}_fee0_S{k}.pt"
+        path = CACHE / "policies" / f"{ticker}_exit_dqn_fixed_policy_B5_fix{N}_fee0_S{k}.pt"
         if not path.exists():
             print(f"  ! missing {path.name} → fallback to always-HOLD")
             nets.append(None); continue
@@ -132,7 +132,7 @@ def _load_full_rl_period(ticker: str = "btc"):
     """Concatenate train + val + test arrays into one contiguous RL period."""
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"{ticker}_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"{ticker}_dqn_state_{split}.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr",
                      "ts", "regime_id"):
             arrs.setdefault(key, []).append(sp[key])
@@ -266,7 +266,7 @@ def run(ticker: str = "btc", N: int = 240, fee: float = 0.0,
               f"{ {k: f'{saved_tp[k]:.4f}→{saved_tp[k]*tp_scale:.4f}' for k in saved_tp} }")
 
     # vol median for ATR-scaled rule exits (used in A2 + rule baseline)
-    vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_med = float(vol["atr_train_median"])
     tp_full, sl_full, trail_full, tab_full, be_full, ts_full = _build_exit_arrays(
         arr["price"], arr["atr"], atr_med)
@@ -420,7 +420,7 @@ def run(ticker: str = "btc", N: int = 240, fee: float = 0.0,
         _restore_exec_config_tp(saved_tp)
         print(f"\n  restored EXECUTION_CONFIG.base_tp_pct to original values")
 
-    out = CACHE / f"{ticker}_groupC2_walkforward_{out_tag}.json"
+    out = CACHE / "results" / f"{ticker}_groupC2_walkforward_{out_tag}.json"
     out.write_text(json.dumps(dict(
         ticker=ticker, N=N, fee=fee, n_folds=N_FOLDS,
         ablate_actions=ablate_actions, tp_scale=tp_scale,

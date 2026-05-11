@@ -77,7 +77,7 @@ def _model_code(ticker, model_type, direction, H):
     return f"{ticker}_{model_type}_dir_{direction}_{H}"
 
 def _model_path(code):
-    return CACHE_DIR / f"{code}.keras"
+    return CACHE_DIR / "preds" / f"{code}.keras"
 
 
 # ── label computation ─────────────────────────────────────────────────────────
@@ -308,14 +308,14 @@ def run_deeplob(ticker):
     print(f"  SEQ_LEN={SEQ_LEN}  OB_LEVELS={OB_LEVELS}")
     print(f"{'='*60}")
 
-    ob_cache = CACHE_DIR / f"{ticker}_deeplob_ob{OB_LEVELS}_scaled.npz"
+    ob_cache = CACHE_DIR / "preds" / f"{ticker}_deeplob_ob{OB_LEVELS}_scaled.npz"
 
     meta    = load_meta(ticker)
     ts_map  = dict(zip(meta["timestamp"].values, range(len(meta))))
     price   = meta["perp_ask_price"].values
     all_lbl = _compute_labels(price)
 
-    assembled = pd.read_parquet(CACHE_DIR / f"{ticker}_features_assembled.parquet")
+    assembled = pd.read_parquet(CACHE_DIR / "features" / f"{ticker}_features_assembled.parquet")
     fc        = [c for c in assembled.columns if c != "timestamp"]
     gap_ok    = _cmask(pd.Series(meta["timestamp"].values), max_lookback=1440)
     X_all     = assembled[fc].values

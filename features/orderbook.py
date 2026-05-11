@@ -42,7 +42,7 @@ def _cols(inst: str, side: str, lo: int, hi: int) -> list[str]:
 
 
 def compute(ticker: str, force: bool = False) -> pd.DataFrame:
-    out = CACHE_DIR / f"{ticker}_features_ob.parquet"
+    out = CACHE_DIR / "features" / f"{ticker}_features_ob.parquet"
     if out.exists() and not force:
         print(f"Loading OB features from cache: {out.name}")
         return pd.read_parquet(out)

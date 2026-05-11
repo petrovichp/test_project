@@ -79,10 +79,10 @@ def _scatter_btc_vs_sharpe(rows, out_png: Path):
 # ── Part A — diagnostics from cached baseline ────────────────────────────────
 
 def part_a():
-    src = CACHE / "btc_groupC2_walkforward_verify_baseline.json"
+    src = CACHE / "results" / "btc_groupC2_walkforward_verify_baseline.json"
     if not src.exists():
         # fall back to the original walkforward output
-        src = CACHE / "btc_groupC2_walkforward_fix240.json"
+        src = CACHE / "results" / "btc_groupC2_walkforward_fix240.json"
     print(f"  Loading cached walkforward: {src.name}")
     data = json.loads(src.read_text())
     rows = data["rows"]
@@ -131,7 +131,7 @@ def part_a():
         print(f"    Long PnL        : {corr_long:+.3f}   (positive → longs benefit from BTC up)")
         print(f"    Short PnL       : {corr_short:+.3f}   (negative expected → shorts benefit from BTC down)")
 
-    out_png = CACHE / "test5_btc_vs_sharpe.png"
+    out_png = CACHE / "plots" / "test5_btc_vs_sharpe.png"
     corr = _scatter_btc_vs_sharpe(rows, out_png)
     print(f"\n  → scatter plot saved: {out_png.name}")
 
@@ -172,7 +172,7 @@ def part_b():
     print(f"  (Note: state vectors are NOT inverted — A2's decisions are unchanged;\n"
           f"   only the simulated trade outcomes use the inverted prices.)")
 
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_med = float(vol["atr_train_median"])
     tp_full, sl_full, trail_full, tab_full, be_full, ts_full = _build_exit_arrays(
         prices_inv, arr["atr"], atr_med)
@@ -262,7 +262,7 @@ def part_b():
     else:
         print(f"  ✗ A2 collapses on inverted data — strong long-bias dependence")
 
-    out = CACHE / "test5_inversion_results.json"
+    out = CACHE / "results" / "test5_inversion_results.json"
     out.write_text(json.dumps(dict(rows=rows,
         summary=dict(
             orig_mean=float(orig_sharpes.mean()),

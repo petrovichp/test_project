@@ -76,18 +76,18 @@ def run(ticker: str = "btc"):
     print(f"{'='*78}")
 
     # ── load aligned source data ─────────────────────────────────────────────
-    pq    = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq    = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     meta  = load_meta(ticker)
     assert (pq["timestamp"].values == meta["timestamp"].values).all()
 
-    vol      = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol      = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_full = pd.Series(vol["atr"]).ffill().bfill().values.astype(np.float32)
     rk_full  = pd.Series(vol["rank"]).ffill().bfill().values.astype(np.float32)
     atr_med  = float(vol["atr_train_median"])
 
     dir_preds = {}
     for col in ["up_60", "down_60", "up_100", "down_100"]:
-        dir_preds[col] = np.load(CACHE / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]
+        dir_preds[col] = np.load(CACHE / "preds" / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]
 
     pq_use   = pq.iloc[WARMUP:].reset_index(drop=True)
     meta_use = meta.iloc[WARMUP:].reset_index(drop=True)
@@ -96,12 +96,12 @@ def run(ticker: str = "btc"):
     df_full = _build_strategy_df(pq_use, meta_use, price, atr_full, rk_full,
                                    dir_preds)
 
-    rg_pq = pd.read_parquet(CACHE / f"{ticker}_regime_cusum_v4.parquet")
+    rg_pq = pd.read_parquet(CACHE / "preds" / f"{ticker}_regime_cusum_v4.parquet")
     regime_full = rg_pq["state_name"].values
     assert len(regime_full) == len(pq_use)
 
     # ── load grid-best params ────────────────────────────────────────────────
-    grid_path = CACHE / f"{ticker}_grid_search_results.json"
+    grid_path = CACHE / "results" / f"{ticker}_grid_search_results.json"
     if grid_path.exists():
         grid_best = json.loads(grid_path.read_text())
         print(f"  grid_search_results loaded: {list(grid_best.keys())}")
@@ -193,7 +193,7 @@ def run(ticker: str = "btc"):
                 ))
 
     df_results = pd.DataFrame(rows)
-    df_results.to_parquet(CACHE / f"{ticker}_walk_forward_results.parquet", index=False)
+    df_results.to_parquet(CACHE / "results" / f"{ticker}_walk_forward_results.parquet", index=False)
 
     # ── per-fold tables ──────────────────────────────────────────────────────
     print(f"\n\n{'='*78}\n  WALK-FORWARD SHARPE PER FOLD\n{'='*78}")

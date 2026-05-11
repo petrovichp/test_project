@@ -21,15 +21,15 @@ SEEDS_K5_DISJOINT = [1, 13, 25, 50, 77]
 
 def load_dqn(tag: str) -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
 
 def evaluate(name, nets, full, atr_median, fee=0.0):
     rows, trades = run_walkforward(nets, full, atr_median, fee=fee, with_reason=False)
-    sp_v = np.load(CACHE / "btc_dqn_state_val.npz")
-    sp_t = np.load(CACHE / "btc_dqn_state_test.npz")
+    sp_v = np.load(CACHE / "state" / "btc_dqn_state_val.npz")
+    sp_t = np.load(CACHE / "state" / "btc_dqn_state_test.npz")
     tp_v, sl_v, tr_v, tab_v, be_v, ts_v = _build_exit_arrays(sp_v["price"], sp_v["atr"], atr_median)
     tp_t, sl_t, tr_t, tab_t, be_t, ts_t = _build_exit_arrays(sp_t["price"], sp_t["atr"], atr_median)
     _, vsh, _, vtr = run_fold(sp_v["state"], sp_v["valid_actions"], sp_v["signals"],
@@ -47,7 +47,7 @@ def evaluate(name, nets, full, atr_median, fee=0.0):
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     full = load_full_rl_period()
 
@@ -76,7 +76,7 @@ def main():
     for r in rows:
         print(f"  {r['name']:<30} " + " ".join(f"{x:>+5.2f}" for x in r['per_fold']))
 
-    out = CACHE / "z1_vote10_results.json"
+    out = CACHE / "results" / "z1_vote10_results.json"
     out.write_text(json.dumps(rows, indent=2, default=str))
     print(f"\n  → {out.name}    [{time.perf_counter()-t0:.1f}s]")
 

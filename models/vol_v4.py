@@ -58,7 +58,7 @@ def run(ticker: str = "btc"):
     t0 = time.perf_counter()
     print(f"\n{'='*70}\n  VOL v4 (ATR-30, no clean_mask) — {ticker.upper()}\n{'='*70}")
 
-    pq        = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq        = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     feat_cols = [c for c in pq.columns if c != "timestamp"]
     X_raw     = pq[feat_cols].values
     ts_arr    = pq["timestamp"].values
@@ -108,7 +108,7 @@ def run(ticker: str = "btc"):
         LGB_PARAMS, ds_fit, num_boost_round=500, valid_sets=[ds_es],
         callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(-1)],
     )
-    model.save_model(str(CACHE / f"{ticker}_lgbm_atr_{HORIZON}_v4.txt"))
+    model.save_model(str(CACHE / "preds" / f"{ticker}_lgbm_atr_{HORIZON}_v4.txt"))
     print(f"    fit done in {time.perf_counter()-t1:.1f}s "
           f"(best_iter={model.best_iteration})")
 
@@ -149,7 +149,7 @@ def run(ticker: str = "btc"):
     full_rank[n_vt_full:] = rank_rl.astype(np.float32)
 
     np.savez(
-        CACHE / f"{ticker}_pred_vol_v4.npz",
+        CACHE / "preds" / f"{ticker}_pred_vol_v4.npz",
         atr        = full_atr,
         rank       = full_rank,
         ts         = ts_arr[WARMUP:].astype(np.int64),

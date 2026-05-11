@@ -25,8 +25,8 @@ def main():
     print(f"\n{'='*70}\n  Build v9 state — combine v7_basis + v8_s11s13\n{'='*70}")
 
     for split in ("train", "val", "test"):
-        d_basis = np.load(CACHE / f"btc_dqn_state_{split}_v7_basis.npz")
-        d_v8    = np.load(CACHE / f"btc_dqn_state_{split}_v8_s11s13.npz")
+        d_basis = np.load(CACHE / "state" / f"btc_dqn_state_{split}_v7_basis.npz")
+        d_v8    = np.load(CACHE / "state" / f"btc_dqn_state_{split}_v8_s11s13.npz")
 
         assert d_basis["state"].shape[0] == d_v8["state"].shape[0]
         n = d_basis["state"].shape[0]
@@ -42,7 +42,7 @@ def main():
         new_signals = d_v8["signals"]          # (n, 11)
         new_valid   = d_v8["valid_actions"]    # (n, 12)
 
-        out = CACHE / f"btc_dqn_state_{split}_v9_basis_s11s13.npz"
+        out = CACHE / "state" / f"btc_dqn_state_{split}_v9_basis_s11s13.npz"
         np.savez(
             out,
             state         = new_state.astype(np.float32),

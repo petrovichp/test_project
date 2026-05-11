@@ -1,6 +1,6 @@
 # Proposals — improve trading under non-zero fees
 
-Saved 2026-05-09 after the fee-aware retrain experiment ([fee_aware_retrain.md](fee_aware_retrain.md)) confirmed that vanilla VOTE5 + post-hoc filter (WF +3.72 at 4.5 bp) still beats fee-baked-in retraining. Per-trade alpha is ~0.20%; round-trip taker fee is 9 bp = 0.09%; ~50% of edge is consumed by fees.
+Saved 2026-05-09 after the fee-aware retrain experiment ([fee_aware_retrain.md](../experiments/fee_aware_retrain.md)) confirmed that vanilla VOTE5 + post-hoc filter (WF +3.72 at 4.5 bp) still beats fee-baked-in retraining. Per-trade alpha is ~0.20%; round-trip taker fee is 9 bp = 0.09%; ~50% of edge is consumed by fees.
 
 This is the parking lot of improvements. **Status: deferred — proceeding with zero-fee algo improvements first.**
 
@@ -17,7 +17,7 @@ This is the parking lot of improvements. **Status: deferred — proceeding with 
 
 ## 2. Concentrate capital where confidence is highest (no retrain)
 
-A2 audit ([trade_quality_by_agreement.md](trade_quality_by_agreement.md)) showed 5-vote trades have ~3× mean PnL of 3-vote trades. Currently all trades sized equally.
+A2 audit ([trade_quality_by_agreement.md](../experiments/trade_quality_by_agreement.md)) showed 5-vote trades have ~3× mean PnL of 3-vote trades. Currently all trades sized equally.
 
 | sub-idea | cost | expected lift @ 4.5 bp | notes |
 |---|---|---:|---|
@@ -26,7 +26,7 @@ A2 audit ([trade_quality_by_agreement.md](trade_quality_by_agreement.md)) showed
 
 ## 3. Tighter TP for trend strategies (audit follow-up #4)
 
-Audit found TP-hit rate is only 3-5% — most trades resolve via TSL/TIME/SL/BE. At fees, slow-bleed trades drag harder than at fee=0. Test 4 from [audit_followup_tests.md](audit_followup_tests.md) — still not run.
+Audit found TP-hit rate is only 3-5% — most trades resolve via TSL/TIME/SL/BE. At fees, slow-bleed trades drag harder than at fee=0. Test 4 from [audit_followup_tests.md](../audits/audit_followup_tests.md) — still not run.
 
 ```
 python3 -m models.group_c2_walkforward --tp-scale 0.85 --out-tag test4a_tp0.85

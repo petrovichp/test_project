@@ -23,13 +23,13 @@ TAGS  = {42: "BASELINE_FULL", 7: "BASELINE_FULL_seed7", 123: "BASELINE_FULL_seed
 
 def _load_policy(tag: str) -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
 
 def eval_split(tag: str, split: str, atr_median: float):
-    sp = np.load(CACHE / f"btc_dqn_state_{split}.npz")
+    sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
     tp, sl, tr, tab, be, ts = _build_exit_arrays(sp["price"], sp["atr"], atr_median)
     out = evaluate_policy(_load_policy(tag), sp["state"], sp["valid_actions"],
                            sp["signals"], sp["price"], tp, sl, tr, tab, be, ts,
@@ -41,9 +41,9 @@ def eval_split(tag: str, split: str, atr_median: float):
 def load_wf(tag_suffix: str):
     """tag_suffix: '' for seed=42 (uses verify_baseline), 'seed7'/'seed123' otherwise."""
     if tag_suffix == "":
-        f = CACHE / "btc_groupC2_walkforward_verify_baseline.json"
+        f = CACHE / "results" / "btc_groupC2_walkforward_verify_baseline.json"
     else:
-        f = CACHE / f"btc_groupC2_walkforward_{tag_suffix}.json"
+        f = CACHE / "results" / f"btc_groupC2_walkforward_{tag_suffix}.json"
     d = json.loads(f.read_text())
     return [r["rule_sharpe"] for r in d["rows"]], [r["rule_eq"] for r in d["rows"]], \
            [r["rule_trades"] for r in d["rows"]]
@@ -56,7 +56,7 @@ def stats(xs, prec=3):
 
 
 def main():
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     rows = {}
@@ -67,7 +67,7 @@ def main():
         v = eval_split(tag, "val",  atr_median)
         t = eval_split(tag, "test", atr_median)
         rows[seed] = dict(
-            train_val_best=json.loads((CACHE / f"btc_dqn_train_history_{tag}.json").read_text())["best_val_sharpe"],
+            train_val_best=json.loads((CACHE / "policies" / f"btc_dqn_train_history_{tag}.json").read_text())["best_val_sharpe"],
             val_sharpe=v["sharpe"],   val_eq=v["equity"],   val_trades=v["trades"],
             test_sharpe=t["sharpe"],  test_eq=t["equity"],  test_trades=t["trades"],
             wf_sharpes=wf_sharpes, wf_eqs=wf_eqs, wf_trades=wf_trades,
@@ -118,7 +118,7 @@ def main():
               f"{m:>+10.3f}{sd:>10.3f}{max(per_seed)-min(per_seed):>+10.3f}")
 
     # save
-    out = CACHE / "seed_variance_results.json"
+    out = CACHE / "results" / "seed_variance_results.json"
     out.write_text(json.dumps({str(k): v for k, v in rows.items()}, indent=2, default=str))
     print(f"\n  → {out.name}")
 

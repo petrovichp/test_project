@@ -1,6 +1,6 @@
 # Phase Z1 — stack proven winners (results)
 
-Per [development_plan.md](development_plan.md) §Z1. Phase complete 2026-05-10.
+Per [development_plan.md](../reference/development_plan.md) §Z1. Phase complete 2026-05-10.
 
 ## TL;DR
 
@@ -119,7 +119,7 @@ At fee=0:
 ## Files
 
 - [models/eval_z1_vote10.py](../models/eval_z1_vote10.py), [models/eval_z1_full.py](../models/eval_z1_full.py)
-- `cache/z1_vote10_results.json`, `cache/z1_results.json`
+- `cache/results/z1_vote10_results.json`, `cache/results/z1_results.json`
 - 20 new policies registered in `model_registry.json` + 5 ensemble entries
 
 ## Next: Z2 — better state

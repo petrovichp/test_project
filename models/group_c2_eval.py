@@ -45,7 +45,7 @@ CACHE = ROOT / "cache"
 
 
 def _load_entry_policy(ticker: str, tag: str = "A2") -> DQN:
-    path = CACHE / f"{ticker}_dqn_policy_{tag}.pt"
+    path = CACHE / "policies" / f"{ticker}_dqn_policy_{tag}.pt"
     net  = DQN(state_dim=50, n_actions=10, hidden=64)
     net.load_state_dict(torch.load(path, map_location="cpu"))
     net.eval()
@@ -55,7 +55,7 @@ def _load_entry_policy(ticker: str, tag: str = "A2") -> DQN:
 def _load_exit_policies(ticker: str, N: int, fee_tag: str = "fee0") -> list:
     nets = []
     for k in range(len(STRAT_KEYS)):
-        path = CACHE / f"{ticker}_exit_dqn_fixed_policy_B5_fix{N}_{fee_tag}_S{k}.pt"
+        path = CACHE / "policies" / f"{ticker}_exit_dqn_fixed_policy_B5_fix{N}_{fee_tag}_S{k}.pt"
         if not path.exists():
             print(f"  ! missing exit policy {path.name} → fallback to always-HOLD")
             nets.append(None); continue
@@ -191,7 +191,7 @@ def run(ticker: str = "btc", N: int = 120, fee: float = 0.0,
 
     results = {}
     for split in ("val", "test"):
-        sp = np.load(CACHE / f"{ticker}_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"{ticker}_dqn_state_{split}.npz")
         print(f"\n  {'─'*72}")
         print(f"  Split {split}: {sp['state'].shape[0]:,} bars  (window N={N})")
 
@@ -235,7 +235,7 @@ def run(ticker: str = "btc", N: int = 120, fee: float = 0.0,
     print(f"    val  Sharpe +7.295  eq 1.398")
     print(f"    test Sharpe +3.776  eq 1.127")
 
-    out = CACHE / f"{ticker}_group{out_tag}_summary.json"
+    out = CACHE / "results" / f"{ticker}_group{out_tag}_summary.json"
     payload = dict(ticker=ticker, fee=fee, entry_tag=entry_tag, N=N,
                     results={s: dict(baseline={k: v for k, v in results[s]["baseline"].items() if k != "actions"},
                                        combined={k: v for k, v in results[s]["combined"].items() if k != "actions"})

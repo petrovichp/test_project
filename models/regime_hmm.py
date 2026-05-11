@@ -81,7 +81,7 @@ def _name_state(means_scaled: np.ndarray) -> str:
 
 
 def _load(ticker: str) -> dict:
-    pq        = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq        = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     feat_cols = [c for c in pq.columns if c != "timestamp"]
     ci        = {c: i for i, c in enumerate(feat_cols)}
     meta      = load_meta(ticker)
@@ -193,7 +193,7 @@ def run(ticker: str = "btc"):
         "state":      states_int.astype(np.int8),   # raw HMM state ID (may carry dup labels)
         "state_name": states,                        # human label (may be non-unique)
     })
-    out = CACHE / f"{ticker}_regime_hmm.parquet"
+    out = CACHE / "preds" / f"{ticker}_regime_hmm.parquet"
     df_out.to_parquet(out, index=False)
     print(f"\n  → {out.name}  ({len(df_out):,} rows)  total {time.perf_counter()-t0:.1f}s")
 

@@ -1,6 +1,6 @@
 # Z3 Step 1 — standalone validation of "killed" strategies S5, S9, S11, S13
 
-Per [development_plan.md](development_plan.md) §Z3 Step 1.
+Per [development_plan.md](../reference/development_plan.md) §Z3 Step 1.
 
 ## Background
 

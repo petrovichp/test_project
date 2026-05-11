@@ -42,7 +42,7 @@ The disjoint pool reproduces the magnitude (best single test +9.86 vs +9.35). **
 | Trades (val/test) | 300 / 199 | 123 / 79 | 457 / 301 |
 | Per-seed greedy val (mean) | n/a | −11.9 | −13.1 |
 
-**Key finding**: per-seed greedy val Sharpes were *negative* on every cross-asset training run; plurality voting recovers a deployable policy via defensive trade-filtering. Test split is the soft spot — ETH essentially flat, SOL half BTC's. See [docs/cross_asset.md](cross_asset.md).
+**Key finding**: per-seed greedy val Sharpes were *negative* on every cross-asset training run; plurality voting recovers a deployable policy via defensive trade-filtering. Test split is the soft spot — ETH essentially flat, SOL half BTC's. See [docs/experiments/cross_asset.md](../experiments/cross_asset.md).
 
 ### Headline: VOTE5_v8_H256_DD
 
@@ -99,7 +99,7 @@ python3 -m models.eval_distill_v8
 - Disjoint validation: trained {1, 13, 25, 50, 77}, family-mean test +6.70 (vs orig +7.85). Magnitude reproduces; s=42 not a lucky outlier.
 - **Voting distilled students underperforms** (DISTILL_v8 VOTE5 ensemble: WF +7.13, test +3.98) — same labels → correlated voters → no diversity benefit. Deploy a single distilled net, not a vote of them.
 
-Doc: [docs/distill_vote5.md](distill_vote5.md). Registry: `DISTILL_v8_seed42` (+ 5 disjoint variants).
+Doc: [docs/experiments/distill_vote5.md](../experiments/distill_vote5.md). Registry: `DISTILL_v8_seed42` (+ 5 disjoint variants).
 
 ---
 
@@ -130,7 +130,7 @@ done
 python3 -m models.eval_cross_asset
 ```
 
-**Caveat**: per-seed greedy val Sharpe is negative on every cross-asset run (−6.8 to −16.3). Plurality voting is what makes the policy deployable. Not all assets recover cleanly on test (ETH test ≈ 0). Doc: [docs/cross_asset.md](cross_asset.md).
+**Caveat**: per-seed greedy val Sharpe is negative on every cross-asset run (−6.8 to −16.3). Plurality voting is what makes the policy deployable. Not all assets recover cleanly on test (ETH test ≈ 0). Doc: [docs/experiments/cross_asset.md](../experiments/cross_asset.md).
 
 ---
 
@@ -149,7 +149,7 @@ The combination wins on every metric except val Sharpe (where DD-alone retains a
 | test | **+4.82** | **+7.80** | +3.10 |
 | fold-6 | **+3.03** | **+7.82** | +3.65 |
 
-**Test +9.01 is the highest test Sharpe in the entire project.** Source: [docs/z1_results.md](z1_results.md).
+**Test +9.01 is the highest test Sharpe in the entire project.** Source: [docs/experiments/z1_results.md](../experiments/z1_results.md).
 
 ### Reproduction
 
@@ -168,7 +168,7 @@ Wall time: 5 × ~2 min training. Network: `DuelingDQN(50, 10, hidden=256)` with 
 
 ### ~~Dropped: BASELINE_VOTE5_H128~~
 
-Previously listed as the "late-period winner". **Exposed as seed-luck in Phase Z1.4**: the original pool's fold-6 +10.70 / test +10.59 collapse to **fold-6 −4.82** / test +5.30 in a disjoint seed pool. Mean across both pools: WF +8.55, fold-6 +2.94. Removed from baseline rotation. See [docs/z1_results.md](z1_results.md) §Z1.4.
+Previously listed as the "late-period winner". **Exposed as seed-luck in Phase Z1.4**: the original pool's fold-6 +10.70 / test +10.59 collapse to **fold-6 −4.82** / test +5.30 in a disjoint seed pool. Mean across both pools: WF +8.55, fold-6 +2.94. Removed from baseline rotation. See [docs/experiments/z1_results.md](../experiments/z1_results.md) §Z1.4.
 
 ### Other baselines retained
 
@@ -179,7 +179,7 @@ Previously listed as the "late-period winner". **Exposed as seed-luck in Phase Z
 - `BASELINE_FULL` (single seed=42): strongest single-seed val (+7.30); not deployable solo (variance ±2.17).
 - `BASELINE_LEAN` (single seed=42, S6/S7/S8 ablated): regime-alternative.
 
-`BASELINE_VOTE5` is documented separately in [voting_ensemble.md](voting_ensemble.md). The remainder of this doc covers `BASELINE_FULL` and `BASELINE_LEAN` (both single-seed) — `BASELINE_VOTE5` shares the same training spec but uses 5 seeds aggregated by plurality voting.
+`BASELINE_VOTE5` is documented separately in [voting_ensemble.md](../experiments/voting_ensemble.md). The remainder of this doc covers `BASELINE_FULL` and `BASELINE_LEAN` (both single-seed) — `BASELINE_VOTE5` shares the same training spec but uses 5 seeds aggregated by plurality voting.
 
 ---
 
@@ -191,15 +191,15 @@ All data lives in `cache/` as parquet/npz. Never touch raw CSVs.
 
 | File | Contents |
 |---|---|
-| `cache/okx_btcusdt_spotpepr_20260425_meta.parquet` | 384,614 bars × 29 columns of market/microstructure data (BTC, 1-min) |
-| `cache/btc_features_v4.parquet` | 191 engineered features (orderbook, price, volume, market, microstructure) |
-| `cache/btc_pred_vol_v4.npz` | LightGBM ATR-30 predictions + `atr_train_median = 0.001834` |
-| `cache/btc_pred_dir_v4.npz` | 4 CNN-LSTM direction predictions (P_up/P_down × 60/100 horizons) |
-| `cache/btc_dqn_state_train.npz` | 50-dim states, 180,000 bars (DQN-train) |
-| `cache/btc_dqn_state_val.npz` | 50,867 bars (DQN-val) |
-| `cache/btc_dqn_state_test.npz` | 52,307 bars (DQN-test, locked) |
+| `cache/raw/okx_btcusdt_spotpepr_20260425_meta.parquet` | 384,614 bars × 29 columns of market/microstructure data (BTC, 1-min) |
+| `cache/features/btc_features_v4.parquet` | 191 engineered features (orderbook, price, volume, market, microstructure) |
+| `cache/preds/btc_pred_vol_v4.npz` | LightGBM ATR-30 predictions + `atr_train_median = 0.001834` |
+| `cache/preds/btc_pred_dir_v4.npz` | 4 CNN-LSTM direction predictions (P_up/P_down × 60/100 horizons) |
+| `cache/state/btc_dqn_state_train.npz` | 50-dim states, 180,000 bars (DQN-train) |
+| `cache/state/btc_dqn_state_val.npz` | 50,867 bars (DQN-val) |
+| `cache/state/btc_dqn_state_test.npz` | 52,307 bars (DQN-test, locked) |
 
-### Splits ([docs/data_splits.md](data_splits.md) is canonical)
+### Splits ([docs/reference/data_splits.md](data_splits.md) is canonical)
 
 | Split | Bar range | Count | Date range | Span |
 |---|---|---|---|---|
@@ -273,7 +273,7 @@ Episodes are bar-by-bar, equity-based:
 - `a == NO_TRADE`: equity unchanged, reward = 0; advance one bar.
 - `a == strategy k`: a synthetic trade is opened with the strategy's entry/exit/sizing config (see Execution config below). The trade runs until TP/SL/breakeven/trail/time-stop fires. Reward = trade PnL fraction. Equity is multiplied by (1 + PnL). Cursor advances to bar after exit.
 - `--trade-penalty 0.001` adds a fixed −0.001 reward per trade entry (in buffer only — eval uses raw PnL).
-- `--fee 0.0` — fee-free training. **The fee=0 setting is the assumption that maker-only execution is achievable** (see [docs/next_steps.md](next_steps.md) Path X). All Sharpe figures are at fee=0.
+- `--fee 0.0` — fee-free training. **The fee=0 setting is the assumption that maker-only execution is achievable** (see [docs/archive/next_steps.md](../archive/next_steps.md) Path X). All Sharpe figures are at fee=0.
 
 ### Exit logic — rule-based ([execution/config.py](../execution/config.py))
 
@@ -320,7 +320,7 @@ python3 -m models.group_c2_walkforward \
 | **Effective action space** | NO_TRADE + S1, S2, S3, S4, S6, S7, S8, S10, S12 |
 | **Train command** | `python3 -m models.dqn_selector btc --tag BASELINE_FULL --fee 0.0 --trade-penalty 0.001 --seed 42` |
 | **Equivalent prior tag** | `A2` |
-| **Policy file** | `cache/btc_dqn_policy_BASELINE_FULL.pt` (md5: `92395edb…`) |
+| **Policy file** | `cache/policies/btc_dqn_policy_BASELINE_FULL.pt` (md5: `92395edb…`) |
 | **Training history** | `cache/btc_dqn_train_history_BASELINE_FULL.json` |
 | **Best DQN-val Sharpe** | +7.295 at grad-step 65,000 |
 | **Total grad steps** | 200,000 (no early stop) |
@@ -366,7 +366,7 @@ python3 -m models.group_c2_walkforward \
 | **Effective action space** | NO_TRADE + S1, S2, S3, S4, S8 + (S12 effectively unused, 0 trades) |
 | **Train command** | `python3 -m models.dqn_selector btc --tag BASELINE_LEAN --fee 0.0 --trade-penalty 0.001 --seed 42 --ablate-actions 5,6,8` |
 | **Equivalent prior tag** | `A2_no_s6_s7_s10` |
-| **Policy file** | `cache/btc_dqn_policy_BASELINE_LEAN.pt` (md5: `db390b88…`) |
+| **Policy file** | `cache/policies/btc_dqn_policy_BASELINE_LEAN.pt` (md5: `db390b88…`) |
 | **Training history** | `cache/btc_dqn_train_history_BASELINE_LEAN.json` |
 | **Best DQN-val Sharpe** | +4.662 at grad-step 20,000 |
 | **Total grad steps** | 45,000 (early-stop) |
@@ -389,7 +389,7 @@ Per-fold direction: trade count higher than FULL (123–247 vs ~150), win rate h
 
 ## Why two baselines
 
-`BASELINE_LEAN` was found in the audit follow-up tests ([audit_followup_tests.md](audit_followup_tests.md) Test 6b). It under-performs on the WF aggregate but **wins on the locked DQN-test split** and on WF folds 3 and 6. Pattern: it does better in the most recent ~80 days of data (folds 5–6 + DQN-test all sit in early 2026).
+`BASELINE_LEAN` was found in the audit follow-up tests ([audit_followup_tests.md](../audits/audit_followup_tests.md) Test 6b). It under-performs on the WF aggregate but **wins on the locked DQN-test split** and on WF folds 3 and 6. Pattern: it does better in the most recent ~80 days of data (folds 5–6 + DQN-test all sit in early 2026).
 
 Two interpretations, neither falsified yet:
 1. *Regime shift hypothesis*: the early-2026 regime favors a smaller action space; FULL over-trades on noise.
@@ -401,11 +401,11 @@ Future experiments compare to **both** baselines. An improvement that beats FULL
 
 | File | Purpose |
 |---|---|
-| `cache/btc_dqn_policy_BASELINE_FULL.pt` | trained network weights (FULL) |
-| `cache/btc_dqn_policy_BASELINE_LEAN.pt` | trained network weights (LEAN) |
+| `cache/policies/btc_dqn_policy_BASELINE_FULL.pt` | trained network weights (FULL) |
+| `cache/policies/btc_dqn_policy_BASELINE_LEAN.pt` | trained network weights (LEAN) |
 | `cache/btc_dqn_train_history_BASELINE_FULL.json` | full training history (history of val Sharpe per checkpoint) |
 | `cache/btc_dqn_train_history_BASELINE_LEAN.json` | full training history |
-| `cache/btc_groupC2_walkforward_verify_baseline.json` | FULL walk-forward (6 folds) |
+| `cache/results/btc_groupC2_walkforward_verify_baseline.json` | FULL walk-forward (6 folds) |
 | `cache/btc_groupC2_walkforward_retrain_no_s6_s7_s10.json` | LEAN walk-forward (6 folds) |
 | [models/dqn_selector.py](../models/dqn_selector.py) | training loop |
 | [models/dqn_network.py](../models/dqn_network.py) | DQN class |

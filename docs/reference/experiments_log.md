@@ -13,7 +13,7 @@ For all train/val/test split boundaries (predictive models, RL, walk-forward fol
 - **Module:** [models/vol_v4.py](../models/vol_v4.py)
 - **Train:** bars [1,440, 101,440), 100,000 rows, full 191-feature set
 - **Holdout:** last 5% of vol-train (early-stopping)
-- **Output:** `cache/btc_lgbm_atr_30_v4.txt`, `cache/btc_pred_vol_v4.npz`
+- **Output:** `cache/preds/btc_lgbm_atr_30_v4.txt`, `cache/preds/btc_pred_vol_v4.npz`
 
 | Metric | Value |
 |---|---|
@@ -67,7 +67,7 @@ vs v3 baseline: −0.05 to −0.09 AUC. Modest degradation from longer OOS span 
 
 - **Module:** [models/dqn_state.py](../models/dqn_state.py)
 - **Output:**
-  - `cache/btc_dqn_standardize_v5.json` (median + IQR per feature, fit on Vol-train)
+  - `cache/state/btc_dqn_standardize_v5.json` (median + IQR per feature, fit on Vol-train)
   - `cache/btc_dqn_state_{train,val,test}.npz`
 
 **State layout (50 dims):**
@@ -377,7 +377,7 @@ One DQN per entry strategy (9 sub-runs), each trained only on that strategy's en
 
 **6/9 positive Δ; best +1.97 (S8_TakerFlow), mean ≈ +0.6.** Per-strategy exit DQNs reliably extract a small lift, but none lift any single strategy into profitable territory at maker fee.
 
-### Decision (per [next_steps.md](next_steps.md) gate)
+### Decision (per [next_steps.md](../archive/next_steps.md) gate)
 
 The +4-Sharpe gate ("captures ≥30% of actual-vs-oracle gap") was not cleared:
 - Best B4 lift +1.97 << +4

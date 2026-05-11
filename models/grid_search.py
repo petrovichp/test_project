@@ -194,18 +194,18 @@ def run(ticker: str = "btc"):
     print(f"\n{'='*72}\n  HYPERPARAM GRID SEARCH  ({ticker.upper()})\n{'='*72}")
 
     # ── load full feature parquet + meta + vol + dir ─────────────────────────
-    pq    = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq    = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     meta  = load_meta(ticker)
     assert (pq["timestamp"].values == meta["timestamp"].values).all()
 
-    vol      = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol      = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_full = pd.Series(vol["atr"]).ffill().bfill().values.astype(np.float32)
     rk_full  = pd.Series(vol["rank"]).ffill().bfill().values.astype(np.float32)
     atr_med  = float(vol["atr_train_median"])
 
     dir_preds = {}
     for col in ["up_60", "down_60", "up_100", "down_100"]:
-        dir_preds[col] = np.load(CACHE / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]
+        dir_preds[col] = np.load(CACHE / "preds" / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]
 
     pq_use   = pq.iloc[WARMUP:].reset_index(drop=True)
     meta_use = meta.iloc[WARMUP:].reset_index(drop=True)
@@ -363,10 +363,10 @@ def run(ticker: str = "btc"):
         all_results.append(dict(strategy=key, **best_per_strategy[key]))
 
     # ── save ─────────────────────────────────────────────────────────────────
-    out_json = CACHE / f"{ticker}_grid_search_results.json"
+    out_json = CACHE / "results" / f"{ticker}_grid_search_results.json"
     out_json.write_text(json.dumps(best_per_strategy, indent=2, default=str))
     pd.DataFrame(all_results).to_parquet(
-        CACHE / f"{ticker}_grid_search_results.parquet", index=False)
+        CACHE / "results" / f"{ticker}_grid_search_results.parquet", index=False)
 
     # ── summary ──────────────────────────────────────────────────────────────
     print(f"\n\n{'='*72}\n  SUMMARY\n{'='*72}")

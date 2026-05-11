@@ -143,7 +143,7 @@ def run(ticker: str = "btc"):
             p_lgbm_v  = lgbm.predict(X_val[ok_val])
             p_lgbm_te = lgbm.predict(X_test[ok_te])
 
-            cnn_path = CACHE_DIR / f"{ticker}_cnn_dir_{direction}_{H}.keras"
+            cnn_path = CACHE_DIR / "preds" / f"{ticker}_cnn_dir_{direction}_{H}.keras"
             if not cnn_path.exists():
                 print(f"  CNN-LSTM not found, skipping.")
                 continue
@@ -220,7 +220,7 @@ def run(ticker: str = "btc"):
             })
 
             # save calibrator
-            cal_path = CACHE_DIR / f"{ticker}_cal_{direction}_{H}.npy"
+            cal_path = CACHE_DIR / "lookup" / f"{ticker}_cal_{direction}_{H}.npy"
             np.save(str(cal_path), {"thresholds": cal.X_thresholds_,
                                     "y_thresholds": cal.y_thresholds_})
 
@@ -237,7 +237,7 @@ def run(ticker: str = "btc"):
                   f"{r['raw_test_prec']:>9.3f}  {r['cal_test_prec']:>9.3f}  "
                   f"{r['raw_test_f1']:>7.3f}  {r['cal_test_f1']:>7.3f}")
 
-        out = CACHE_DIR / f"{ticker}_calibration_eval.parquet"
+        out = CACHE_DIR / "lookup" / f"{ticker}_calibration_eval.parquet"
         df.to_parquet(out, index=False)
         print(f"\nResults → {out.name}")
 

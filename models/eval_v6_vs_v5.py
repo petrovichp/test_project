@@ -27,7 +27,7 @@ N_FOLDS = 6
 
 def load_net(tag: str, state_dim: int) -> DQN:
     net = DQN(state_dim, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -36,7 +36,7 @@ def load_full_rl_period(version: str = "v5"):
     suffix = "" if version == "v5" else f"_{version}"
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"btc_dqn_state_{split}{suffix}.npz")
+        sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}{suffix}.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr", "ts"):
             arrs.setdefault(key, []).append(sp[key])
     return {k: np.concatenate(arrs[k], axis=0) for k in arrs}
@@ -44,7 +44,7 @@ def load_full_rl_period(version: str = "v5"):
 
 def eval_split(policy_fn, split: str, atr_median: float, version: str = "v5"):
     suffix = "" if version == "v5" else f"_{version}"
-    sp = np.load(CACHE / f"btc_dqn_state_{split}{suffix}.npz")
+    sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}{suffix}.npz")
     tp, sl, tr, tab, be, ts = _build_exit_arrays(sp["price"], sp["atr"], atr_median)
     out = evaluate_with_policy(policy_fn(), sp["state"], sp["valid_actions"],
                                  sp["signals"], sp["price"], tp, sl, tr, tab, be, ts)
@@ -91,7 +91,7 @@ TAG_V6 = {s: f"BASELINE_FULL_V6_seed{s}" for s in SEEDS}
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     full_v5 = load_full_rl_period("v5")
@@ -171,7 +171,7 @@ def main():
         print(f"    fold {fi+1}: v5={vv5:>+7.2f}  v6={vv6:>+7.2f}  Δ={vv6-vv5:>+7.2f}")
 
     # save
-    out = CACHE / "eval_v6_vs_v5_results.json"
+    out = CACHE / "results" / "eval_v6_vs_v5_results.json"
     out.write_text(json.dumps({
         "per_seed": per_seed,
         "ensemble_v5": dict(val=v5_val, test=v5_test, wf=v5_wf, wf_mean=v5_wf_mean),

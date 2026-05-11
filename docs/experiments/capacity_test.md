@@ -97,7 +97,7 @@ The single-seed mean WF lift (h=64 +7.74 → h=256 +9.85, Δ +2.11) is dramatic.
 
 ## Decision
 
-**All three baselines retained.** Update [baselines.md](baselines.md) and add VOTE5_H128 + VOTE5_H256 as formal alternatives. BASELINE_VOTE5 (h=64) remains the recommended default for its balance.
+**All three baselines retained.** Update [baselines.md](../reference/baselines.md) and add VOTE5_H128 + VOTE5_H256 as formal alternatives. BASELINE_VOTE5 (h=64) remains the recommended default for its balance.
 
 For Path A continuation:
 - A2 (trade quality by vote agreement) on which baseline? → **all three**, see if vote-strength predicts quality.
@@ -109,4 +109,4 @@ For Path A continuation:
 |---|---|
 | [models/eval_capacity.py](../models/eval_capacity.py) | per-seed + ensemble eval across hidden ∈ {64, 128, 256} |
 | `cache/btc_dqn_policy_BASELINE_FULL_h{128,256}_seed{42,7,123,0,99}.pt` | 10 trained policies |
-| `cache/eval_capacity_results.json` | aggregated metrics |
+| `cache/results/eval_capacity_results.json` | aggregated metrics |

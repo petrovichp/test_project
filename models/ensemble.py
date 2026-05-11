@@ -123,7 +123,7 @@ def _print_cm(label, split, t_label, models_data):
 # ── ATR rank feature ──────────────────────────────────────────────────────────
 
 def _get_atr_rank(X_train, X_val, X_test, ticker):
-    vol_path = CACHE_DIR / f"{ticker}_lgbm_atr_30.txt"
+    vol_path = CACHE_DIR / "preds" / f"{ticker}_lgbm_atr_30.txt"
     if vol_path.exists():
         vol_model = lgb.Booster(model_file=str(vol_path))
     else:
@@ -220,7 +220,7 @@ def run(ticker: str = "btc"):
             print(f"  LightGBM  val={auc_lgbm_v:.4f}  test={auc_lgbm_te:.4f}")
 
             # ── CNN-LSTM (two-stage, load cached) ─────────────────────────────
-            cnn_path = CACHE_DIR / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
+            cnn_path = CACHE_DIR / "preds" / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
             if not cnn_path.exists():
                 print(f"  CNN-LSTM two-stage model not found: {cnn_path.name}")
                 print(f"  Run: python3 -m models.two_stage {ticker}")
@@ -311,7 +311,7 @@ def run(ticker: str = "btc"):
                   f"{r['cnn_val']:>8.4f}  {r['cnn_test']:>9.4f}  "
                   f"{r['ens_val']:>8.4f}  {r['ens_test']:>9.4f}")
 
-        out = CACHE_DIR / f"{ticker}_ensemble_eval.parquet"
+        out = CACHE_DIR / "lookup" / f"{ticker}_ensemble_eval.parquet"
         df.to_parquet(out, index=False)
         print(f"\nResults → {out.name}")
 

@@ -26,7 +26,7 @@ SEEDS   = [42, 7, 123, 0, 99]
 def load_net(tag: str, dueling: bool):
     cls = DuelingDQN if dueling else DQN
     net = cls(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -34,14 +34,14 @@ def load_net(tag: str, dueling: bool):
 def load_full_rl_period():
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"btc_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr", "ts"):
             arrs.setdefault(key, []).append(sp[key])
     return {k: np.concatenate(arrs[k], axis=0) for k in arrs}
 
 
 def eval_split(policy_fn, split: str, atr_median: float):
-    sp = np.load(CACHE / f"btc_dqn_state_{split}.npz")
+    sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
     tp, sl, tr, tab, be, ts = _build_exit_arrays(sp["price"], sp["atr"], atr_median)
     out = evaluate_with_policy(policy_fn(), sp["state"], sp["valid_actions"],
                                  sp["signals"], sp["price"], tp, sl, tr, tab, be, ts)
@@ -123,7 +123,7 @@ def eval_pool(algo: str, atr_median, full):
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     full = load_full_rl_period()
 
@@ -173,7 +173,7 @@ def main():
         per_fold = [results[a]["ensemble"]["wf_per_fold"][fi] for a in ("dqn","double","dueling","double_dueling")]
         print(f"    fold {fi+1}: " + " ".join(f"{x:>+7.2f}" for x in per_fold))
 
-    out = CACHE / "eval_algo_results.json"
+    out = CACHE / "results" / "eval_algo_results.json"
     out.write_text(json.dumps(results, indent=2, default=str))
     print(f"\n  → {out.name}    [{time.perf_counter()-t0:.1f}s]")
 

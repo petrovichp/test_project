@@ -52,7 +52,7 @@ def _rolling_hurst(returns: np.ndarray, window: int = WINDOW) -> np.ndarray:
 
 
 def _load(ticker: str) -> dict:
-    pq        = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq        = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     feat_cols = [c for c in pq.columns if c != "timestamp"]
     ci        = {c: i for i, c in enumerate(feat_cols)}
     meta      = load_meta(ticker)
@@ -167,7 +167,7 @@ def run(ticker: str = "btc"):
         "state":      np.array([s2i[s] for s in states], dtype=np.int8),
         "state_name": states,
     })
-    out = CACHE / f"{ticker}_regime_cusum.parquet"
+    out = CACHE / "preds" / f"{ticker}_regime_cusum.parquet"
     df_out.to_parquet(out, index=False)
     print(f"\n  → {out.name}  ({len(df_out):,} rows)  total {time.perf_counter()-t0:.1f}s")
 

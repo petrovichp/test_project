@@ -100,7 +100,7 @@ def run(ticker: str = "btc"):
     all_vol = _compute_targets(price)
 
     # ── Stage 1: get ATR predictions for all splits ───────────────────────────
-    vol_path = CACHE_DIR / f"{VOL_MODEL}.txt"
+    vol_path = CACHE_DIR / "preds" / f"{VOL_MODEL}.txt"
     if vol_path.exists():
         print(f"  Loading vol model: {VOL_MODEL}")
         vol_model = lgb.Booster(model_file=str(vol_path))
@@ -199,8 +199,8 @@ def run(ticker: str = "btc"):
                   f"test={_auc(y_te[ok_te],pts_lgbm_te):.4f}")
 
             # ── CNN-LSTM baseline (load cached) ───────────────────────────────
-            cnn_path = CACHE_DIR / f"{ticker}_cnn_dir_{direction}_{H}.keras"
-            cnn_ts_path = CACHE_DIR / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
+            cnn_path = CACHE_DIR / "preds" / f"{ticker}_cnn_dir_{direction}_{H}.keras"
+            cnn_ts_path = CACHE_DIR / "preds" / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
 
             Xs_tr_b, ys_tr = _build_sequences(X_tr_seq, y_tr, SEQ_LEN)
             Xs_v_b,  ys_v  = _build_sequences(X_v_seq,  y_v,  SEQ_LEN)
@@ -299,7 +299,7 @@ def run(ticker: str = "btc"):
                   f"{r['base_test_prec']:>10.3f}  {r['ts_test_prec']:>9.3f}  "
                   f"{r['base_test_f1']:>8.3f}  {r['ts_test_f1']:>7.3f}")
 
-        out = CACHE_DIR / f"{ticker}_two_stage_eval.parquet"
+        out = CACHE_DIR / "lookup" / f"{ticker}_two_stage_eval.parquet"
         df.to_parquet(out, index=False)
         print(f"\nResults → {out.name}")
 

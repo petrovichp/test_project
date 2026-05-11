@@ -29,8 +29,8 @@ VOL_MODEL = "atr_30"
 
 
 def _vol_preds(ticker, X_sc_tr, X_sc_v, X_sc_te):
-    model_path = CACHE_DIR / f"{ticker}_lgbm_{VOL_MODEL}.txt"
-    cache_path = CACHE_DIR / f"{ticker}_pred_vol.npz"
+    model_path = CACHE_DIR / "preds" / f"{ticker}_lgbm_{VOL_MODEL}.txt"
+    cache_path = CACHE_DIR / "preds" / f"{ticker}_pred_vol.npz"
 
     if cache_path.exists() and cache_path.stat().st_mtime >= model_path.stat().st_mtime:
         d = np.load(cache_path)
@@ -57,8 +57,8 @@ def _dir_preds(ticker, X_sc_tr, X_sc_v, X_sc_te, feat_cols, rank_tr, rank_v, ran
     for H in HORIZONS:
         for direction in ["up", "down"]:
             col        = f"{direction}_{H}"
-            model_path = CACHE_DIR / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
-            cache_path = CACHE_DIR / f"{ticker}_pred_dir_{col}.npz"
+            model_path = CACHE_DIR / "preds" / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
+            cache_path = CACHE_DIR / "preds" / f"{ticker}_pred_dir_{col}.npz"
 
             if cache_path.exists() and model_path.exists() and \
                cache_path.stat().st_mtime >= model_path.stat().st_mtime:
@@ -100,8 +100,8 @@ def _regime_preds(ticker: str, ts_v: np.ndarray, ts_te: np.ndarray,
     Cache is invalidated when source parquet mtime changes OR the timestamp
     arrays don't match the cached ones (data refresh case).
     """
-    src   = CACHE_DIR / f"{ticker}_{regime_file}.parquet"
-    cache = CACHE_DIR / f"{ticker}_{regime_file}_preds.npz"
+    src   = CACHE_DIR / "preds" / f"{ticker}_{regime_file}.parquet"
+    cache = CACHE_DIR / "preds" / f"{ticker}_{regime_file}_preds.npz"
 
     if not src.exists():
         return None, None

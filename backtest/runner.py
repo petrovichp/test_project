@@ -29,8 +29,8 @@ from backtest.engine import run as bt_run
 from strategy.agent import STRATEGIES, DEFAULT_PARAMS
 
 CACHE_DIR = Path(__file__).parent.parent / "cache"
-RESULTS_FILE = CACHE_DIR / "strategy_results.parquet"
-EQUITY_FILE  = CACHE_DIR / "strategy_equity.parquet"
+RESULTS_FILE = CACHE_DIR / "results" / "strategy_results.parquet"
+EQUITY_FILE  = CACHE_DIR / "results" / "strategy_equity.parquet"
 
 
 # ── ML prediction pre-computation ────────────────────────────────────────────
@@ -41,7 +41,7 @@ def _get_ml_predictions(ticker, X_val, feat_cols, ts_val, meta):
     price  = meta["perp_ask_price"].values
 
     # ATR predictions (vol model)
-    vol_path = CACHE_DIR / f"{ticker}_lgbm_atr_30.txt"
+    vol_path = CACHE_DIR / "preds" / f"{ticker}_lgbm_atr_30.txt"
     vol_model = lgb.Booster(model_file=str(vol_path))
 
     # need ATR rank — fit on train predictions
@@ -73,7 +73,7 @@ def _get_ml_predictions(ticker, X_val, feat_cols, ts_val, meta):
     for H in HORIZONS:
         for direction in ["up", "down"]:
             col      = f"{direction}_{H}"
-            lgb_path = CACHE_DIR / f"{ticker}_direction_lgbm_{col}.txt"
+            lgb_path = CACHE_DIR / "preds" / f"{ticker}_direction_lgbm_{col}.txt"
             if lgb_path.exists():
                 lgbm_preds[col] = lgb.Booster(model_file=str(lgb_path)).predict(X_val_aug)
             else:
@@ -84,7 +84,7 @@ def _get_ml_predictions(ticker, X_val, feat_cols, ts_val, meta):
     for H in HORIZONS:
         for direction in ["up", "down"]:
             col      = f"{direction}_{H}"
-            cnn_path = CACHE_DIR / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
+            cnn_path = CACHE_DIR / "preds" / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
             if cnn_path.exists():
                 cnn = tf.keras.models.load_model(str(cnn_path))
                 y_v = _lbl(ts_val, col)
@@ -242,8 +242,8 @@ def run(ticker: str = "btc"):
 
     _, X_test_, _, _, _, _, ts_test_ = assemble(ticker)
 
-    atr_train    = lgb.Booster(model_file=str(CACHE_DIR / f"{ticker}_lgbm_atr_30.txt")).predict(X_train)
-    atr_test_raw = lgb.Booster(model_file=str(CACHE_DIR / f"{ticker}_lgbm_atr_30.txt")).predict(X_test_)
+    atr_train    = lgb.Booster(model_file=str(CACHE_DIR / "preds" / f"{ticker}_lgbm_atr_30.txt")).predict(X_train)
+    atr_test_raw = lgb.Booster(model_file=str(CACHE_DIR / "preds" / f"{ticker}_lgbm_atr_30.txt")).predict(X_test_)
     atr_rank_te  = np.clip(np.searchsorted(np.sort(atr_train), atr_test_raw) / len(atr_train), 0, 1)
 
     X_test_aug   = np.column_stack([X_test_, atr_rank_te])
@@ -257,8 +257,8 @@ def run(ticker: str = "btc"):
     for H in HORIZONS:
         for direction in ["up", "down"]:
             col      = f"{direction}_{H}"
-            lgb_path = CACHE_DIR / f"{ticker}_direction_lgbm_{col}.txt"
-            cnn_path = CACHE_DIR / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
+            lgb_path = CACHE_DIR / "preds" / f"{ticker}_direction_lgbm_{col}.txt"
+            cnn_path = CACHE_DIR / "preds" / f"{ticker}_cnn2s_dir_{direction}_{H}.keras"
             lp = lgb.Booster(model_file=str(lgb_path)).predict(X_test_aug) if lgb_path.exists() \
                  else np.full(len(X_test_), 0.5)
             if cnn_path.exists():

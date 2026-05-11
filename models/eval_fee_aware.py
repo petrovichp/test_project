@@ -23,7 +23,7 @@ REAL_FEE = 0.00045   # OKX taker per side
 
 def load_dqn(tag: str) -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -36,8 +36,8 @@ def eval_config(name, nets, full, atr_median, fees, vote_thr=1, allowlist=None):
                                               strat_allowlist=allowlist, with_reason=False)
         wf = statistics.mean(r["sharpe"] for r in rows_f)
         wf_pos = sum(1 for r in rows_f if r["sharpe"] > 0)
-        sp_val = np.load(CACHE / "btc_dqn_state_val.npz")
-        sp_test = np.load(CACHE / "btc_dqn_state_test.npz")
+        sp_val = np.load(CACHE / "state" / "btc_dqn_state_val.npz")
+        sp_test = np.load(CACHE / "state" / "btc_dqn_state_test.npz")
         tp_v, sl_v, tr_v, tab_v, be_v, ts_v = _build_exit_arrays(sp_val["price"], sp_val["atr"], atr_median)
         tp_t, sl_t, tr_t, tab_t, be_t, ts_t = _build_exit_arrays(sp_test["price"], sp_test["atr"], atr_median)
         _, val_sh, _, _ = run_fold(sp_val["state"], sp_val["valid_actions"], sp_val["signals"],
@@ -59,7 +59,7 @@ def eval_config(name, nets, full, atr_median, fees, vote_thr=1, allowlist=None):
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     full = load_full_rl_period()
 
@@ -90,7 +90,7 @@ def main():
     all_results += eval_config("FEE4_p005 (no filter)", nets_p005, full, atr_median, fees)
     all_results += eval_config("FEE4_p005 + vote≥3", nets_p005, full, atr_median, fees, vote_thr=3)
 
-    out = CACHE / "eval_fee_aware_results.json"
+    out = CACHE / "results" / "eval_fee_aware_results.json"
     out.write_text(json.dumps(all_results, indent=2, default=str))
     print(f"\n  → {out.name}    [{time.perf_counter()-t0:.1f}s]")
 

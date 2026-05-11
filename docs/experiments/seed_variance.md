@@ -113,8 +113,8 @@ This does not invalidate the conclusion that we found no clear winner — but it
 | File | Contents |
 |---|---|
 | [models/seed_variance.py](../models/seed_variance.py) | analysis script |
-| `cache/btc_dqn_policy_BASELINE_FULL_seed7.pt` | seed=7 policy weights |
-| `cache/btc_dqn_policy_BASELINE_FULL_seed123.pt` | seed=123 policy weights |
+| `cache/policies/btc_dqn_policy_BASELINE_FULL_seed7.pt` | seed=7 policy weights |
+| `cache/policies/btc_dqn_policy_BASELINE_FULL_seed123.pt` | seed=123 policy weights |
 | `cache/btc_dqn_train_history_BASELINE_FULL_seed{7,123}.json` | training histories |
 | `cache/btc_groupC2_walkforward_seed{7,123}.json` | per-seed walk-forward results |
-| `cache/seed_variance_results.json` | aggregated metrics |
+| `cache/results/seed_variance_results.json` | aggregated metrics |

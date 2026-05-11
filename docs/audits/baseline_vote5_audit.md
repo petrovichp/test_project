@@ -11,7 +11,7 @@ Reproduction:
 python3 -m models.audit_vote5
 ```
 
-Output: `cache/audit_vote5_trades.json` — full per-trade log + aggregated stats.
+Output: `cache/results/audit_vote5_trades.json` — full per-trade log + aggregated stats.
 
 ## Per-fold summary
 
@@ -94,7 +94,7 @@ The pattern is clear: when BTC drops, shorts amplify; when BTC rises, longs lead
 
 Average vote count per strategy ranges 2.92–3.23 — modal vote at K=5 plurality is 3 (since ≥3 nets must agree to fire). All strategies look similar by avg votes; vote strength doesn't strongly differentiate strategy quality.
 
-(The detailed vote-vs-PnL stratification is in [trade_quality_by_agreement.md](trade_quality_by_agreement.md).)
+(The detailed vote-vs-PnL stratification is in [trade_quality_by_agreement.md](../experiments/trade_quality_by_agreement.md).)
 
 ## Implications
 
@@ -116,4 +116,4 @@ Average vote count per strategy ranges 2.92–3.23 — modal vote at K=5 plurali
 | File | Contents |
 |---|---|
 | [models/audit_vote5.py](../models/audit_vote5.py) | per-trade tracer + aggregator |
-| `cache/audit_vote5_trades.json` | full 1,122-trade log + aggregated stats |
+| `cache/results/audit_vote5_trades.json` | full 1,122-trade log + aggregated stats |

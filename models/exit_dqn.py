@@ -501,12 +501,12 @@ def train(ticker: str = "btc", seed: int = 42, tag: str = "B1",
           f"reward_scale={REWARD_SCALE}\n{'='*78}")
 
     # ── load DQN-train and DQN-val arrays (same as entry DQN) ───────────────
-    sp_tr = np.load(CACHE / f"{ticker}_dqn_state_train.npz")
-    sp_v  = np.load(CACHE / f"{ticker}_dqn_state_val.npz")
+    sp_tr = np.load(CACHE / "state" / f"{ticker}_dqn_state_train.npz")
+    sp_v  = np.load(CACHE / "state" / f"{ticker}_dqn_state_val.npz")
     print(f"  DQN-train: state {sp_tr['state'].shape}")
     print(f"  DQN-val  : state {sp_v['state'].shape}")
 
-    vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     # ── build per-bar exit-param arrays ─────────────────────────────────────
@@ -629,7 +629,7 @@ def train(ticker: str = "btc", seed: int = 42, tag: str = "B1",
                 best_val_sharpe = val["sharpe"]
                 best_step       = step
                 torch.save(online.state_dict(),
-                            CACHE / f"{ticker}_exit_dqn_policy_{tag}.pt")
+                            CACHE / "policies" / f"{ticker}_exit_dqn_policy_{tag}.pt")
             if step - best_step > EARLY_STOP_PATIENCE:
                 print(f"\n  Early stop at step {step} "
                       f"(best Sharpe={best_val_sharpe:+.3f} @ {best_step:,})")
@@ -645,7 +645,7 @@ def train(ticker: str = "btc", seed: int = 42, tag: str = "B1",
     print(f"  Δ vs rule-only       : {best_val_sharpe - baseline['sharpe']:+.3f}")
     print(f"  policy saved to      : cache/{ticker}_exit_dqn_policy_{tag}.pt")
 
-    hist_path = CACHE / f"{ticker}_exit_dqn_history_{tag}.json"
+    hist_path = CACHE / "policies" / f"{ticker}_exit_dqn_history_{tag}.json"
     hist_path.write_text(json.dumps(dict(
         ticker=ticker, run_at=datetime.utcnow().isoformat(),
         tag=tag, fee=fee, strat_filter=strat_filter,

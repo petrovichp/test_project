@@ -45,7 +45,7 @@ def run(ticker: str = "btc"):
     t0 = time.perf_counter()
     print(f"\n{'='*70}\n  REGIME CUSUM v4 — {ticker.upper()}\n{'='*70}")
 
-    pq        = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq        = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     ts_arr    = pq["timestamp"].values
     bb        = pq["bb_width"].values
 
@@ -157,7 +157,7 @@ def run(ticker: str = "btc"):
         "state":      np.array([S2I[s] for s in states], dtype=np.int8),
         "state_name": states,
     })
-    out = CACHE / f"{ticker}_regime_cusum_v4.parquet"
+    out = CACHE / "preds" / f"{ticker}_regime_cusum_v4.parquet"
     df_out.to_parquet(out, index=False)
 
     thresh = {
@@ -165,7 +165,7 @@ def run(ticker: str = "btc"):
         "hurst_p65": hurst_hi, "hurst_p35": hurst_lo,
         "bb_p30": bb_lo, "kw_p_value": float(p) if len(groups) >= 2 else None,
     }
-    (CACHE / f"{ticker}_regime_cusum_v4_thresholds.json").write_text(json.dumps(thresh, indent=2))
+    (CACHE / "lookup" / f"{ticker}_regime_cusum_v4_thresholds.json").write_text(json.dumps(thresh, indent=2))
 
     print(f"\n  → {out.name}  ({len(df_out):,} rows)  total {time.perf_counter()-t0:.1f}s")
 

@@ -1,6 +1,6 @@
 # Z2.1 — Cross-asset (ETH, SOL) — MIXED-POSITIVE
 
-Executed 2026-05-11. Path Z2.1 from [development_plan.md](development_plan.md).
+Executed 2026-05-11. Path Z2.1 from [development_plan.md](../reference/development_plan.md).
 
 ## Hypothesis
 

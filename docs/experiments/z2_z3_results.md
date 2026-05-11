@@ -1,6 +1,6 @@
 # Z2 + Z3 Steps 2/3/4 — results
 
-Per [development_plan.md](development_plan.md). Phase Z2/Z3 partial execution. Completed 2026-05-11.
+Per [development_plan.md](../reference/development_plan.md). Phase Z2/Z3 partial execution. Completed 2026-05-11.
 
 ## TL;DR
 
@@ -56,9 +56,9 @@ Step 2 (price-action context) was a **negative result** — drop. Step 3 (basis+
 
 **Why it worked**: S11 and S13 cover **signal types not in the original 9 strategies**. S11 fires on basis momentum (perp-spot z-score), S13 on cross-instrument OB disagreement. The DQN learned to gate them effectively — trade count grew modestly (1372 → 1416 on WF), suggesting selective use. Val activity (S11=5.94%, S13=1.58% of bars) confirms non-trivial firing.
 
-**Per the audit-driven thesis (from [docs/z3_step1_killed_strategies.md](z3_step1_killed_strategies.md))**: the "killed" verdict on these strategies from older work was based on standalone Sharpe alone. In the DQN action space they prove their value by adding regime contexts that the existing 9 don't cover.
+**Per the audit-driven thesis (from [docs/experiments/z3_step1_killed_strategies.md](z3_step1_killed_strategies.md))**: the "killed" verdict on these strategies from older work was based on standalone Sharpe alone. In the DQN action space they prove their value by adding regime contexts that the existing 9 don't cover.
 
-**Verdict**: ✅ **NEW PRIMARY BASELINE**. Promotes to top of [docs/baselines.md](baselines.md).
+**Verdict**: ✅ **NEW PRIMARY BASELINE**. Promotes to top of [docs/reference/baselines.md](../reference/baselines.md).
 
 ## Updated baseline leaderboard (post Step 4)
 

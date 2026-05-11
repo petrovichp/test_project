@@ -113,7 +113,7 @@ This is a useful negative result — it eliminates a hypothesis I had high confi
 | [models/eval_v6_vs_v5.py](../models/eval_v6_vs_v5.py) | per-seed and ensemble v5 vs v6 evaluator |
 | `cache/btc_dqn_state_{train,val,test}_v6.npz` | v6 state arrays (54-dim) |
 | `cache/btc_dqn_policy_BASELINE_FULL_V6_seed{42,7,123,0,99}.pt` | v6 trained policies |
-| `cache/eval_v6_vs_v5_results.json` | aggregated comparison metrics |
+| `cache/results/eval_v6_vs_v5_results.json` | aggregated comparison metrics |
 
 ## Implications for prior planning
 

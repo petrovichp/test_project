@@ -118,18 +118,18 @@ def run(ticker: str = "btc", strategy_key: str = "S1_VolDir"):
     print(f"\n  Plotting BTC vs {strategy_key} equity curves over RL period ...")
 
     # ── load source ──────────────────────────────────────────────────────────
-    pq    = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq    = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     meta  = load_meta(ticker)
     assert (pq["timestamp"].values == meta["timestamp"].values).all()
 
-    vol      = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol      = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_full = pd.Series(vol["atr"]).ffill().bfill().values.astype(np.float32)
     rk_full  = pd.Series(vol["rank"]).ffill().bfill().values.astype(np.float32)
     atr_med  = float(vol["atr_train_median"])
 
     dir_preds = {}
     for col in ["up_60", "down_60", "up_100", "down_100"]:
-        dir_preds[col] = np.load(CACHE / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]
+        dir_preds[col] = np.load(CACHE / "preds" / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]
 
     pq_use   = pq.iloc[WARMUP:].reset_index(drop=True)
     meta_use = meta.iloc[WARMUP:].reset_index(drop=True)
@@ -245,7 +245,7 @@ def run(ticker: str = "btc", strategy_key: str = "S1_VolDir"):
 
     plt.tight_layout(rect=[0, 0.03, 1, 1])
 
-    out = CACHE / f"{ticker}_{strategy_key}_equity_vs_price.png"
+    out = CACHE / "plots" / f"{ticker}_{strategy_key}_equity_vs_price.png"
     plt.savefig(str(out), dpi=140, bbox_inches="tight")
     print(f"\n  → {out}")
     print(f"  total time {time.perf_counter()-t0:.1f}s")

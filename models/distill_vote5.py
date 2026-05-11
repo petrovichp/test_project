@@ -54,10 +54,10 @@ def train_student(seed: int, tag: str, soft_weight: float = SOFT_WEIGHT):
     print(f"\n{'='*70}\n  C2 self-distillation — student tag={tag}  seed={seed}\n"
           f"  soft_weight={soft_weight}  (0 = pure CE; >0 mixes MSE-to-Q_teacher)\n{'='*70}")
 
-    sp_tr = np.load(CACHE / f"btc_dqn_state_train{STATE_SUFFIX}.npz")
-    sp_v  = np.load(CACHE / f"btc_dqn_state_val{STATE_SUFFIX}.npz")
-    tgt_tr = np.load(CACHE / "btc_distill_targets_train_v8.npz")
-    tgt_v  = np.load(CACHE / "btc_distill_targets_val_v8.npz")
+    sp_tr = np.load(CACHE / "state" / f"btc_dqn_state_train{STATE_SUFFIX}.npz")
+    sp_v  = np.load(CACHE / "state" / f"btc_dqn_state_val{STATE_SUFFIX}.npz")
+    tgt_tr = np.load(CACHE / "distill" / "btc_distill_targets_train_v8.npz")
+    tgt_v  = np.load(CACHE / "distill" / "btc_distill_targets_val_v8.npz")
 
     s_tr = torch.from_numpy(sp_tr["state"]).float()
     v_tr = torch.from_numpy(sp_tr["valid_actions"]).bool()
@@ -81,7 +81,7 @@ def train_student(seed: int, tag: str, soft_weight: float = SOFT_WEIGHT):
     opt = torch.optim.Adam(student.parameters(), lr=LR)
 
     # build val exit arrays for greedy Sharpe eval
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     v_tp, v_sl, v_tr_, v_tab, v_be, v_ts = _build_exit_arrays(
         sp_v["price"], sp_v["atr"], atr_median)
@@ -160,14 +160,14 @@ def train_student(seed: int, tag: str, soft_weight: float = SOFT_WEIGHT):
                 best_val_sharpe = val["sharpe"]
                 best_acc = acc_all
                 best_epoch = epoch
-                torch.save(student.state_dict(), CACHE / f"btc_dqn_policy_{tag}_seed{seed}.pt")
+                torch.save(student.state_dict(), CACHE / "policies" / f"btc_dqn_policy_{tag}_seed{seed}.pt")
 
     elapsed = time.perf_counter() - t0
     print(f"\n  best val Sharpe={best_val_sharpe:+.3f} at epoch {best_epoch} "
           f"(acc={best_acc*100:.1f}%)  [{elapsed:.0f}s]")
     print(f"  policy → cache/btc_dqn_policy_{tag}_seed{seed}.pt")
 
-    hist_path = CACHE / f"btc_dqn_train_history_{tag}_seed{seed}.json"
+    hist_path = CACHE / "policies" / f"btc_dqn_train_history_{tag}_seed{seed}.json"
     hist_path.write_text(json.dumps(dict(
         tag=tag, seed=seed, run_at=datetime.utcnow().isoformat(),
         soft_weight=soft_weight,

@@ -1,10 +1,10 @@
 # Z3 strategy feasibility — data check
 
-Verifying whether the four proposed Z3 strategies (S13–S16 in [development_plan.md](development_plan.md)) can be implemented with **only** the existing cached parquets.
+Verifying whether the four proposed Z3 strategies (S13–S16 in [development_plan.md](../reference/development_plan.md)) can be implemented with **only** the existing cached parquets.
 
 **Data used**:
-- `cache/okx_btcusdt_spotpepr_20260425_meta.parquet` — 384,614 rows × 29 cols
-- `cache/okx_btcusdt_spotpepr_20260425_ob.parquet` — 384,614 rows × 801 cols (200 bins × 2 sides × 2 instruments + timestamp)
+- `cache/raw/okx_btcusdt_spotpepr_20260425_meta.parquet` — 384,614 rows × 29 cols
+- `cache/raw/okx_btcusdt_spotpepr_20260425_ob.parquet` — 384,614 rows × 801 cols (200 bins × 2 sides × 2 instruments + timestamp)
 
 ## Per-strategy data availability
 

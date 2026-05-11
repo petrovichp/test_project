@@ -254,7 +254,7 @@ def run(ticker: str = "btc"):
                         })
 
     df  = pd.DataFrame(all_rows)
-    out = CACHE_DIR / f"{ticker}_confusion_eval.parquet"
+    out = CACHE_DIR / "lookup" / f"{ticker}_confusion_eval.parquet"
     df.to_parquet(out, index=False)
     print(f"\n\nAll results → {out.name}")
     return df

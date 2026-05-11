@@ -27,7 +27,7 @@ DISJOINT_SEEDS = [1, 13, 25, 50, 77]
 
 def load_net(tag):
     n = DuelingDQN(52, 12, 256)
-    n.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    n.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     n.eval(); return n
 
 
@@ -80,7 +80,7 @@ def _eval_curve(policy_fn, sp, atr_median):
 
 
 def main():
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     # all distilled student nets
@@ -92,7 +92,7 @@ def main():
     summary = []
 
     for ax, split in zip(axes, ["val", "test"]):
-        sp = np.load(CACHE / f"btc_dqn_state_{split}_v8_s11s13.npz")
+        sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}_v8_s11s13.npz")
         dates = pd.to_datetime(sp["ts"], unit="s")
 
         # all 5 orig single students (thin grey-blue)
@@ -157,7 +157,7 @@ def main():
     fig.suptitle("C2 distilled students vs VOTE5_v8 teacher  (fee=0, masked-CE distillation)",
                  fontsize=13, y=0.995)
     fig.tight_layout()
-    out = CACHE / "plot_distill_v8.png"
+    out = CACHE / "plots" / "plot_distill_v8.png"
     fig.savefig(out, dpi=130)
     print(f"\n  → {out}")
 
@@ -169,7 +169,7 @@ def main():
               f"Sh={r['teacher_sharpe']:+5.2f}×{r['teacher_eq']:.2f}({r['teacher_trades']:>3})  "
               f"×{r['bh_eq']:.2f}")
 
-    (CACHE / "plot_distill_v8_summary.json").write_text(json.dumps(summary, indent=2))
+    (CACHE / "plots" / "plot_distill_v8_summary.json").write_text(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":

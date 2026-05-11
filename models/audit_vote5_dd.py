@@ -24,7 +24,7 @@ REGIME_NAMES = ["calm", "trend_up", "trend_down", "ranging", "chop"]
 
 def load_dueling(tag: str) -> DuelingDQN:
     net = DuelingDQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -32,7 +32,7 @@ def load_dueling(tag: str) -> DuelingDQN:
 def load_full_rl_period():
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"btc_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr", "ts", "regime_id"):
             arrs.setdefault(key, []).append(sp[key])
     return {k: np.concatenate(arrs[k], axis=0) for k in arrs}
@@ -156,7 +156,7 @@ def run_walkforward(nets, full, atr_median, fee: float = 0.0,
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     full = load_full_rl_period()
     nets = [load_dueling(f"VOTE5_DD_seed{s}") for s in SEEDS]
@@ -239,8 +239,8 @@ def main():
         wf = statistics.mean(r["sharpe"] for r in rows_f)
         wf_pos = sum(1 for r in rows_f if r["sharpe"] > 0)
         # also val and test single-shot
-        sp_val = np.load(CACHE / "btc_dqn_state_val.npz")
-        sp_test = np.load(CACHE / "btc_dqn_state_test.npz")
+        sp_val = np.load(CACHE / "state" / "btc_dqn_state_val.npz")
+        sp_test = np.load(CACHE / "state" / "btc_dqn_state_test.npz")
         tp_v, sl_v, tr_v, tab_v, be_v, ts_v = _build_exit_arrays(sp_val["price"], sp_val["atr"], atr_median)
         tp_t, sl_t, tr_t, tab_t, be_t, ts_t = _build_exit_arrays(sp_test["price"], sp_test["atr"], atr_median)
         _, val_sh, _, _ = run_fold(sp_val["state"], sp_val["valid_actions"], sp_val["signals"],
@@ -270,8 +270,8 @@ def main():
                                               strat_allowlist=allowlist, with_reason=False)
         wf = statistics.mean(r["sharpe"] for r in rows_r)
         wf_pos = sum(1 for r in rows_r if r["sharpe"] > 0)
-        sp_val = np.load(CACHE / "btc_dqn_state_val.npz")
-        sp_test = np.load(CACHE / "btc_dqn_state_test.npz")
+        sp_val = np.load(CACHE / "state" / "btc_dqn_state_val.npz")
+        sp_test = np.load(CACHE / "state" / "btc_dqn_state_test.npz")
         tp_v, sl_v, tr_v, tab_v, be_v, ts_v = _build_exit_arrays(sp_val["price"], sp_val["atr"], atr_median)
         tp_t, sl_t, tr_t, tab_t, be_t, ts_t = _build_exit_arrays(sp_test["price"], sp_test["atr"], atr_median)
         _, val_sh, _, _ = run_fold(sp_val["state"], sp_val["valid_actions"], sp_val["signals"],
@@ -306,7 +306,7 @@ def main():
     measure("top-5 + vote ≥ 4", vote_thr=4, allowlist={0, 3, 5, 6, 7})
 
     # save
-    out = CACHE / "audit_vote5_dd_results.json"
+    out = CACHE / "results" / "audit_vote5_dd_results.json"
     out.write_text(json.dumps(dict(
         part_a=dict(per_fold=rows, n_trades=len(trades),
                        wf_mean=wf_mean, by_strategy={k: len(v) for k, v in by_strat.items()},

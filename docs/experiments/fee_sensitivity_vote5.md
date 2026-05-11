@@ -1,9 +1,9 @@
 # Vanilla BASELINE_VOTE5 — fee sensitivity & trade-count reduction
 
-Mirror of [vote5_dd_audit.md](vote5_dd_audit.md) Parts B+C, run on **vanilla VOTE5** (5×DQN, seeds 42/7/123/0/99, plurality voting).
+Mirror of [vote5_dd_audit.md](../audits/vote5_dd_audit.md) Parts B+C, run on **vanilla VOTE5** (5×DQN, seeds 42/7/123/0/99, plurality voting).
 
 Source: [models/fee_sensitivity_vote5.py](../models/fee_sensitivity_vote5.py).
-Output: [cache/fee_sensitivity_vote5_results.json](../cache/fee_sensitivity_vote5_results.json).
+Output: [cache/results/fee_sensitivity_vote5_results.json](../cache/results/fee_sensitivity_vote5_results.json).
 
 ## Headline
 

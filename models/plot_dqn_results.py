@@ -185,8 +185,8 @@ def run(ticker: str = "btc"):
     print(f"\n  Loading DQN policies + state arrays ...")
 
     # ── concat DQN-val + DQN-test for OOS plotting ──────────────────────────
-    sp_v = np.load(CACHE / f"{ticker}_dqn_state_val.npz")
-    sp_t = np.load(CACHE / f"{ticker}_dqn_state_test.npz")
+    sp_v = np.load(CACHE / "state" / f"{ticker}_dqn_state_val.npz")
+    sp_t = np.load(CACHE / "state" / f"{ticker}_dqn_state_test.npz")
     state   = np.concatenate([sp_v["state"],         sp_t["state"]])
     valid   = np.concatenate([sp_v["valid_actions"], sp_t["valid_actions"]])
     signals = np.concatenate([sp_v["signals"],       sp_t["signals"]])
@@ -198,7 +198,7 @@ def run(ticker: str = "btc"):
           f"({dt[0].strftime('%Y-%m-%d')} → {dt[-1].strftime('%Y-%m-%d')})")
 
     # ── exit arrays (precompute once) ───────────────────────────────────────
-    vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_med = float(vol["atr_train_median"])
     tp, sl, trail, tab, be, ts_bars = _build_exit_arrays(prices, atr, atr_med)
 
@@ -223,7 +223,7 @@ def run(ticker: str = "btc"):
 
     curves = {}
     for cid, fee, color, label in cells:
-        path = CACHE / f"{ticker}_dqn_policy_{cid}.pt"
+        path = CACHE / "policies" / f"{ticker}_dqn_policy_{cid}.pt"
         if not path.exists():
             print(f"  ✗ missing {path.name}, skipping {cid}")
             continue
@@ -300,7 +300,7 @@ def run(ticker: str = "btc"):
 
     plt.tight_layout(rect=[0, 0.03, 1, 1])
 
-    out = CACHE / f"{ticker}_dqn_groupA_equity_vs_price.png"
+    out = CACHE / "plots" / f"{ticker}_dqn_groupA_equity_vs_price.png"
     plt.savefig(str(out), dpi=140, bbox_inches="tight")
     plt.close()
     print(f"\n  → {out}")

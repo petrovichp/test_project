@@ -43,7 +43,7 @@ def assemble(
     All NaN rows and gap-contaminated rows are removed before splitting.
     Scaler is fit on train only.
     """
-    cache_file = CACHE_DIR / f"{ticker}_features_assembled.parquet"
+    cache_file = CACHE_DIR / "features" / f"{ticker}_features_assembled.parquet"
 
     if cache_file.exists() and not force:
         print(f"Loading assembled features from cache: {cache_file.name}")

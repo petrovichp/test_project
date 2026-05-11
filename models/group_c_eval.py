@@ -49,7 +49,7 @@ CACHE = ROOT / "cache"
 # ── load helpers ─────────────────────────────────────────────────────────────
 
 def _load_entry_policy(ticker: str, tag: str = "A4") -> DQN:
-    path = CACHE / f"{ticker}_dqn_policy_{tag}.pt"
+    path = CACHE / "policies" / f"{ticker}_dqn_policy_{tag}.pt"
     net  = DQN(state_dim=50, n_actions=10, hidden=64)
     net.load_state_dict(torch.load(path, map_location="cpu"))
     net.eval()
@@ -61,7 +61,7 @@ def _load_exit_policies(ticker: str, prefix: str = "B4_S") -> list:
     Index aligns with STRAT_KEYS."""
     nets = []
     for k in range(len(STRAT_KEYS)):
-        path = CACHE / f"{ticker}_exit_dqn_policy_{prefix}{k}.pt"
+        path = CACHE / "policies" / f"{ticker}_exit_dqn_policy_{prefix}{k}.pt"
         if not path.exists():
             print(f"  ! missing exit policy {path.name} — using rule-only fallback for k={k}")
             nets.append(None)
@@ -232,12 +232,12 @@ def run(ticker: str = "btc", fee: float = 0.0004, entry_tag: str = "A4",
     print(f"  loading 9 exit policies {exit_prefix}0..8 ...")
     exit_nets = _load_exit_policies(ticker, prefix=exit_prefix)
 
-    vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_med = float(vol["atr_train_median"])
 
     results = {}
     for split in ("val", "test"):
-        sp = np.load(CACHE / f"{ticker}_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"{ticker}_dqn_state_{split}.npz")
         print(f"\n  {'─'*72}")
         print(f"  Split {split}: {sp['state'].shape[0]:,} bars")
         tp, sl, tr, tab, be, ts = _build_exit_arrays(sp["price"], sp["atr"], atr_med)
@@ -278,7 +278,7 @@ def run(ticker: str = "btc", fee: float = 0.0004, entry_tag: str = "A4",
               f"{d_sharpe:>+10.3f}  {d_eq*100:>+8.2f}%")
 
     # ── save artefacts ──────────────────────────────────────────────────────
-    out = CACHE / f"{ticker}_group{out_tag}_summary.json"
+    out = CACHE / "results" / f"{ticker}_group{out_tag}_summary.json"
     payload = dict(ticker=ticker, fee=fee, entry_tag=entry_tag,
                     exit_prefix=exit_prefix,
                     results={s: dict(rule_only=_pack(results[s]["rule_only"], drop_eq=True),

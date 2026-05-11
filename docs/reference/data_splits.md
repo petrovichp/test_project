@@ -105,7 +105,7 @@ These are also in [CLAUDE.md](../CLAUDE.md). The split layout exists to enforce 
 
 ```python
 import pandas as pd
-meta = pd.read_parquet('cache/okx_btcusdt_spotpepr_20260425_meta.parquet')
+meta = pd.read_parquet('cache/raw/okx_btcusdt_spotpepr_20260425_meta.parquet')
 ts = pd.to_datetime(meta['timestamp'].values, unit='s')
 
 WARMUP, VOL_TRAIN_E, DIR_TRAIN_E = 1_440, 101_440, 91_440

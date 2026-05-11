@@ -47,13 +47,13 @@ def main(ticker: str = "btc"):
 
     # Load existing v5 state for all 3 splits
     splits = ["train", "val", "test"]
-    data = {nm: np.load(CACHE / f"{ticker}_dqn_state_{nm}.npz") for nm in splits}
+    data = {nm: np.load(CACHE / "state" / f"{ticker}_dqn_state_{nm}.npz") for nm in splits}
     sizes = [data[nm]["state"].shape[0] for nm in splits]
     print(f"  v5 sizes: train={sizes[0]:,}  val={sizes[1]:,}  test={sizes[2]:,}")
 
     # Load features parquet + meta — needed for S11/S13 signal computation
     print(f"  Loading features parquet + meta ...")
-    pq   = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq   = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     meta = load_meta(ticker)
     ts_pq   = pq["timestamp"].values
     ts_meta = meta["timestamp"].values
@@ -113,7 +113,7 @@ def main(ticker: str = "btc"):
         assert new_valid.shape   == (sizes[splits.index(nm)], 12), new_valid.shape
         assert new_state.shape   == (sizes[splits.index(nm)], 52), new_state.shape
 
-        out = CACHE / f"{ticker}_dqn_state_{nm}_v8_s11s13.npz"
+        out = CACHE / "state" / f"{ticker}_dqn_state_{nm}_v8_s11s13.npz"
         np.savez(
             out,
             state         = new_state,

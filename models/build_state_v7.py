@@ -132,7 +132,7 @@ def main():
 
     # ── load + concatenate v5 state ─────────────────────────────────────────
     splits = ["train", "val", "test"]
-    data = {nm: np.load(CACHE / f"btc_dqn_state_{nm}.npz") for nm in splits}
+    data = {nm: np.load(CACHE / "state" / f"btc_dqn_state_{nm}.npz") for nm in splits}
     sizes = [data[nm]["state"].shape[0] for nm in splits]
     boundaries = np.cumsum([0] + sizes)   # e.g. [0, 180000, 230867, 283174]
 
@@ -168,7 +168,7 @@ def main():
     feats_std = {k: _std(a, stats[k]["median"], stats[k]["iqr"]) for k, a in feats.items()}
 
     # ── save stats ──────────────────────────────────────────────────────────
-    out_json = CACHE / f"btc_dqn_standardize_v7_{args.variant}.json"
+    out_json = CACHE / "state" / f"btc_dqn_standardize_v7_{args.variant}.json"
     out_json.write_text(json.dumps(stats, indent=2))
     print(f"  → {out_json.name}")
 
@@ -183,7 +183,7 @@ def main():
         new_state = np.concatenate([old_state, extra_full[a:b]], axis=1)
         assert new_state.shape == (sizes[i], 50 + n_new), new_state.shape
 
-        out = CACHE / f"btc_dqn_state_{nm}_v7_{args.variant}.npz"
+        out = CACHE / "state" / f"btc_dqn_state_{nm}_v7_{args.variant}.npz"
         np.savez(
             out,
             state         = new_state,

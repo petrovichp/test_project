@@ -2,14 +2,14 @@
 
 ## Reproducibility
 
-- Every trained model has an explicit `--tag` so the policy file is `cache/btc_dqn_policy_{tag}.pt`.
+- Every trained model has an explicit `--tag` so the policy file is `cache/policies/btc_dqn_policy_{tag}.pt`.
 - Every training run sets `--seed` explicitly. Default seed is 42 for the canonical baseline; multi-seed runs use 42, 7, 123, 0, 99.
 - Fixed config: `total_steps=200_000`, `lr=1e-3`, `batch=128`, `buffer=80_000`, `warmup=5_000`, `gamma=0.99`. Document any deviation in the experiment doc.
 
 ## Documentation
 
-- Every meaningful experiment gets a `docs/{experiment_name}.md` doc with: what was tested, the command(s), the per-fold + aggregate results table, and a verdict.
-- Cross-link new docs from `CLAUDE.md` and from the `docs/experiments_log.md` if it exists.
+- Every meaningful experiment gets a `docs/experiments/{experiment_name}.md` doc with: what was tested, the command(s), the per-fold + aggregate results table, and a verdict. (Audit docs go in `docs/audits/`, parked ideas in `docs/proposals/`.)
+- Cross-link new docs from `CLAUDE.md`, `docs/README.md`, and `docs/reference/experiments_log.md`.
 - After committing, the doc must be enough for someone (including future-me) to reproduce without rereading the conversation.
 - If the experiment trained any new model artifact, also follow [model-registry.md](model-registry.md) — register every `.pt` / `.txt` file in `model_registry.json`.
 
@@ -19,7 +19,7 @@
 
 What to add:
 
-1. **A status-block bullet** (the `> ...` quoted block at the top): one line summarizing the finding, headline metrics, and a link to the experiment's `docs/{experiment_name}.md`. Include a verdict word: POSITIVE / NEGATIVE / MIXED / DIAGNOSTIC.
+1. **A status-block bullet** (the `> ...` quoted block at the top): one line summarizing the finding, headline metrics, and a link to the experiment's `docs/{subfolder}/{experiment_name}.md`. Include a verdict word: POSITIVE / NEGATIVE / MIXED / DIAGNOSTIC.
 
 2. **Update the date** in the status header (`**Status (YYYY-MM-DD, post {experiment} ...):**`) so future readers know how fresh the summary is.
 
@@ -30,7 +30,7 @@ What to add:
 The bullet format follows the existing pattern in `RESULTS.md`:
 
 ```
-> - **{Experiment name} — {VERDICT}** ([docs/{experiment_name}.md](docs/...)). One-sentence summary. Headline metrics in **bold** for the new finding (e.g. WF +X.XX, val +X.XX). Optional second sentence on implication.
+> - **{Experiment name} — {VERDICT}** ([docs/experiments/{experiment_name}.md](docs/experiments/...)). One-sentence summary. Headline metrics in **bold** for the new finding (e.g. WF +X.XX, val +X.XX). Optional second sentence on implication.
 ```
 
 This update lives in the same commit as the docs/code/registry-entry — one commit per experiment, no exceptions. A finding without a `RESULTS.md` line is a finding that future-me will not see.

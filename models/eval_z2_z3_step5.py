@@ -17,14 +17,14 @@ SEEDS = [42, 7, 123, 0, 99]
 
 def load_dueling(tag, hidden, state_dim, n_actions):
     net = DuelingDQN(state_dim, n_actions, hidden)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval(); return net
 
 
 def load_full_rl_period_for(suffix):
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"btc_dqn_state_{split}{suffix}.npz")
+        sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}{suffix}.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr", "ts", "regime_id"):
             arrs.setdefault(key, []).append(sp[key])
     return {k: np.concatenate(arrs[k], axis=0) for k in arrs}
@@ -32,8 +32,8 @@ def load_full_rl_period_for(suffix):
 
 def evaluate(name, nets, full, atr_median, suffix=""):
     rows, trades = run_walkforward(nets, full, atr_median, fee=0.0, with_reason=False)
-    sp_v  = np.load(CACHE / f"btc_dqn_state_val{suffix}.npz")
-    sp_t  = np.load(CACHE / f"btc_dqn_state_test{suffix}.npz")
+    sp_v  = np.load(CACHE / "state" / f"btc_dqn_state_val{suffix}.npz")
+    sp_t  = np.load(CACHE / "state" / f"btc_dqn_state_test{suffix}.npz")
     tp_v, sl_v, tr_v, tab_v, be_v, ts_v = _build_exit_arrays(sp_v["price"], sp_v["atr"], atr_median)
     tp_t, sl_t, tr_t, tab_t, be_t, ts_t = _build_exit_arrays(sp_t["price"], sp_t["atr"], atr_median)
     _, vsh, _, vtr = run_fold(sp_v["state"], sp_v["valid_actions"], sp_v["signals"],
@@ -51,7 +51,7 @@ def evaluate(name, nets, full, atr_median, suffix=""):
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     print(f"\n{'='*100}\n  Z2/Z3 STEP 5 — Combined v7_basis + v8 (basis state + S11/S13 actions)\n{'='*100}")
@@ -82,7 +82,7 @@ def main():
     print(f"  {'─ VOTE5_v8 (Step 4)':<37} " + " ".join(f"{x:>+5.2f}" for x in [11.14, 19.43, 13.08, 18.01, 6.29, 4.44]))
     print(f"  {r['name']:<37} " + " ".join(f"{x:>+5.2f}" for x in r['per_fold']))
 
-    out = CACHE / "z2_z3_step5_results.json"
+    out = CACHE / "results" / "z2_z3_step5_results.json"
     out.write_text(json.dumps(r, indent=2, default=str))
     print(f"\n  → {out.name}    [{time.perf_counter()-t0:.1f}s]")
 

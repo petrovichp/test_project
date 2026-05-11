@@ -103,7 +103,7 @@ Promoted as a formal baseline alongside others. Best for "regime change is likel
 | [models/dqn_network.py](../models/dqn_network.py) | DuelingDQN class (lines 38-60) |
 | [models/dqn_selector.py](../models/dqn_selector.py) | --algo flag (dqn/double/dueling/double_dueling) |
 | `cache/btc_dqn_policy_VOTE5_DOUBLE_seed*.pt`, `_DUELING_*.pt`, `_DD_*.pt` | 15 trained policies |
-| `cache/eval_algo_results.json` | aggregated metrics |
+| `cache/results/eval_algo_results.json` | aggregated metrics |
 
 ## Implications for future work
 

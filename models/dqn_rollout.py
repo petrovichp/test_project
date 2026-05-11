@@ -392,7 +392,7 @@ def run(ticker: str = "btc", buffer_size: int = 80_000, seed: int = 42,
     print(f"\n{'='*70}\n  PHASE 3.2 — RANDOM-POLICY ROLLOUT  ({ticker.upper()})\n{'='*70}")
 
     # ── load DQN-train state arrays ──────────────────────────────────────────
-    sp = np.load(CACHE / f"{ticker}_dqn_state_train.npz")
+    sp = np.load(CACHE / "state" / f"{ticker}_dqn_state_train.npz")
     state    = sp["state"]                    # (180000, 50)
     valid    = sp["valid_actions"]            # (180000, 10)
     sigs     = sp["signals"]                  # (180000, 9)  ∈ {-1,0,+1}
@@ -403,7 +403,7 @@ def run(ticker: str = "btc", buffer_size: int = 80_000, seed: int = 42,
     n_bars = len(state)
 
     # ── ATR train-median (from vol_v4 npz) ───────────────────────────────────
-    vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     print(f"  atr_train_median = {atr_median:.4f}")
 

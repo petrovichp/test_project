@@ -18,7 +18,7 @@ CACHE = pathlib.Path("cache")
 
 def _load_policy(tag: str) -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -34,7 +34,7 @@ def _build_mask(ablate: list[int]) -> np.ndarray | None:
 
 
 def run_split(split: str, policy_tag: str, ablate: list[int], atr_median: float):
-    sp = np.load(CACHE / f"btc_dqn_state_{split}.npz")
+    sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
     tp, sl, tr, tab, be, ts_arr = _build_exit_arrays(sp["price"], sp["atr"], atr_median)
     net = _load_policy(policy_tag)
     out = evaluate_policy(
@@ -47,7 +47,7 @@ def run_split(split: str, policy_tag: str, ablate: list[int], atr_median: float)
 
 
 def main():
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     fig, axes = plt.subplots(2, 1, figsize=(13, 9), sharex=False)
@@ -99,7 +99,7 @@ def main():
     fig.suptitle("A2 baseline vs A2 no_s6+s7+s10 vs BTC buy-and-hold (fee=0)",
                  fontsize=13, y=0.995)
     fig.tight_layout()
-    out_png = CACHE / "plot_no_s6s7s10_vs_baseline_vs_bh.png"
+    out_png = CACHE / "plots" / "plot_no_s6s7s10_vs_baseline_vs_bh.png"
     fig.savefig(out_png, dpi=130)
     print(f"\n  → {out_png}")
 
@@ -113,7 +113,7 @@ def main():
               f"{r['base_eq']:>9.3f} {r['abl_eq']:>9.3f} {r['bh_eq']:>9.3f} "
               f"{r['base_trades']:>12} {r['abl_trades']:>11}")
 
-    (CACHE / "plot_no_s6s7s10_summary.json").write_text(
+    (CACHE / "plots" / "plot_no_s6s7s10_summary.json").write_text(
         json.dumps(summary_rows, indent=2, default=str))
 
 

@@ -90,7 +90,7 @@ _META_EXTRA = [
 
 def _load_splits(ticker: str) -> dict:
     """Load assembled features, apply gap mask, and split 50/25/25."""
-    pq        = pd.read_parquet(CACHE_DIR / f"{ticker}_features_assembled.parquet")
+    pq        = pd.read_parquet(CACHE_DIR / "features" / f"{ticker}_features_assembled.parquet")
     feat_cols = [c for c in pq.columns if c != "timestamp"]
 
     meta       = load_meta(ticker)
@@ -438,7 +438,7 @@ def run(ticker: str = "btc", regime_file: str = None):
 
     # ── 6. Save results ───────────────────────────────────────────────────────
     df_out   = pd.DataFrame(rows)
-    out_path = CACHE_DIR / f"{ticker}_backtest_results.parquet"
+    out_path = CACHE_DIR / "lookup" / f"{ticker}_backtest_results.parquet"
     df_out.to_parquet(out_path, index=False)
     print(f"\n  Results → {out_path.name}")
 

@@ -32,7 +32,7 @@ def _latest_csv(ticker: str) -> Path:
 
 def _cache_paths(csv_path: Path) -> tuple[Path, Path]:
     stem = csv_path.stem
-    return CACHE_DIR / f"{stem}_meta.parquet", CACHE_DIR / f"{stem}_ob.parquet"
+    return CACHE_DIR / "raw" / f"{stem}_meta.parquet", CACHE_DIR / "raw" / f"{stem}_ob.parquet"
 
 
 def _build_cache(csv_path: Path, meta_path: Path, ob_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:

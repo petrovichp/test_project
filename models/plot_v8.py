@@ -20,13 +20,13 @@ SEEDS = [42, 7, 123, 0, 99]
 
 def load_dqn(tag, hidden=64):
     net = DQN(50, 10, hidden)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval(); return net
 
 
 def load_dueling(tag, hidden, state_dim, n_actions):
     net = DuelingDQN(state_dim, n_actions, hidden)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval(); return net
 
 
@@ -79,7 +79,7 @@ def _eval_with_curve(policy_fn, sp, atr_median):
 
 
 def main():
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     # 3 ensembles + BH
@@ -98,8 +98,8 @@ def main():
 
     for ax, split in zip(axes, ["val", "test"]):
         # Use v8 state cache (52-dim) for v8 — others use their own cache
-        sp_v5 = np.load(CACHE / f"btc_dqn_state_{split}.npz")
-        sp_v8 = np.load(CACHE / f"btc_dqn_state_{split}_v8_s11s13.npz")
+        sp_v5 = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
+        sp_v8 = np.load(CACHE / "state" / f"btc_dqn_state_{split}_v8_s11s13.npz")
 
         eq_v5, sh_v5, eq_5_, nt_5 = _eval_with_curve(make_vote5, sp_v5, atr_median)
         eq_h,  sh_h,  eq_h_, nt_h = _eval_with_curve(make_h256,  sp_v5, atr_median)
@@ -138,7 +138,7 @@ def main():
     fig.suptitle("VOTE5_v8_H256_DD (NEW, Step 4) vs prior baselines  (fee=0)",
                  fontsize=13, y=0.995)
     fig.tight_layout()
-    out = CACHE / "plot_v8_vs_baselines.png"
+    out = CACHE / "plots" / "plot_v8_vs_baselines.png"
     fig.savefig(out, dpi=130)
     print(f"\n  → {out}")
 
@@ -150,7 +150,7 @@ def main():
               f"Sh={r['v8_sharpe']:+5.2f}×{r['v8_eq']:.2f}({r['v8_trades']:>4}) "
               f"×{r['bh_eq']:.2f}")
 
-    (CACHE / "plot_v8_summary.json").write_text(json.dumps(summary, indent=2))
+    (CACHE / "plots" / "plot_v8_summary.json").write_text(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":

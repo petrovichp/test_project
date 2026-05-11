@@ -24,7 +24,7 @@ SEEDS = [42, 7, 123, 0, 99]
 def load_net(tag: str, seed: int) -> DuelingDQN:
     net = DuelingDQN(52, 12, 256)
     net.load_state_dict(torch.load(
-        CACHE / f"btc_dqn_policy_{tag}_seed{seed}.pt", map_location="cpu"))
+        CACHE / "policies" / f"btc_dqn_policy_{tag}_seed{seed}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -32,7 +32,7 @@ def load_net(tag: str, seed: int) -> DuelingDQN:
 def load_full_v8():
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"btc_dqn_state_{split}_v8_s11s13.npz")
+        sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}_v8_s11s13.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr", "ts", "regime_id"):
             arrs.setdefault(key, []).append(sp[key])
     return {k: np.concatenate(arrs[k], axis=0) for k in arrs}
@@ -43,8 +43,8 @@ def eval_pack(nets, full, atr_median, label):
     wf = statistics.mean(r["sharpe"] for r in rows)
     pos = sum(1 for r in rows if r["sharpe"] > 0)
     # val + test single shot
-    sp_v = np.load(CACHE / "btc_dqn_state_val_v8_s11s13.npz")
-    sp_t = np.load(CACHE / "btc_dqn_state_test_v8_s11s13.npz")
+    sp_v = np.load(CACHE / "state" / "btc_dqn_state_val_v8_s11s13.npz")
+    sp_t = np.load(CACHE / "state" / "btc_dqn_state_test_v8_s11s13.npz")
     tp_v, sl_v, tr_v, tab_v, be_v, ts_v = _build_exit_arrays(sp_v["price"], sp_v["atr"], atr_median)
     tp_t, sl_t, tr_t, tab_t, be_t, ts_t = _build_exit_arrays(sp_t["price"], sp_t["atr"], atr_median)
     _, vsh, veq, vtr = run_fold(sp_v["state"], sp_v["valid_actions"], sp_v["signals"],
@@ -63,7 +63,7 @@ def eval_pack(nets, full, atr_median, label):
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     full = load_full_v8()
 
@@ -86,7 +86,7 @@ def main():
     rows.append(eval_pack([load_net("VOTE5_v8_H256_DD", s) for s in SEEDS], full, atr_median,
                           "BASELINE VOTE5_v8_H256_DD"))
 
-    out = CACHE / "distill_v8_eval.json"
+    out = CACHE / "results" / "distill_v8_eval.json"
     out.write_text(json.dumps(rows, indent=2))
     print(f"\n  → {out.name}    [{time.perf_counter()-t0:.1f}s]")
 

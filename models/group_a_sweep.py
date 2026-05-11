@@ -71,7 +71,7 @@ def run_cell(cell_id: str, fee: float, penalty: float, ticker: str = "btc",
         if summary_started or "[step" in line or "Early stop" in line:
             print("    " + line)
 
-    hist_path = CACHE / f"{ticker}_dqn_train_history_{cell_id}.json"
+    hist_path = CACHE / "policies" / f"{ticker}_dqn_train_history_{cell_id}.json"
     if not hist_path.exists():
         print(f"  ✗ history file missing: {hist_path}")
         return dict(cell_id=cell_id, fee=fee, trade_penalty=penalty,
@@ -123,8 +123,8 @@ def run(ticker: str = "btc", seed: int = 42):
     total_elapsed = time.perf_counter() - t_total
 
     df = pd.DataFrame(rows)
-    df.to_parquet(CACHE / f"{ticker}_dqn_groupA_summary.parquet", index=False)
-    (CACHE / f"{ticker}_dqn_groupA_summary.json").write_text(
+    df.to_parquet(CACHE / "lookup" / f"{ticker}_dqn_groupA_summary.parquet", index=False)
+    (CACHE / "results" / f"{ticker}_dqn_groupA_summary.json").write_text(
         json.dumps(rows, indent=2, default=str))
 
     # ── summary table ───────────────────────────────────────────────────────

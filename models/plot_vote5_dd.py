@@ -20,14 +20,14 @@ SEEDS = [42, 7, 123, 0, 99]
 
 def load_dqn(tag: str) -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
 
 def load_dueling(tag: str) -> DuelingDQN:
     net = DuelingDQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -81,7 +81,7 @@ def _eval_with_curve(policy_fn, sp, atr_median):
 
 
 def main():
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     # build VOTE5 (vanilla DQN)
@@ -97,7 +97,7 @@ def main():
     summary = []
 
     for ax, split in zip(axes, ["val", "test"]):
-        sp = np.load(CACHE / f"btc_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
         eq_v5,  sh_v5,  eq_5,  nt_5  = _eval_with_curve(make_vote5,    sp, atr_median)
         eq_dd,  sh_dd,  eq_d,  nt_d  = _eval_with_curve(make_vote5_dd, sp, atr_median)
         bh = sp["price"] / sp["price"][0]
@@ -132,7 +132,7 @@ def main():
     fig.suptitle("BASELINE_VOTE5_DD (Double_Dueling) vs BASELINE_VOTE5 (DQN) vs BTC B&H (fee=0)",
                  fontsize=13, y=0.995)
     fig.tight_layout()
-    out = CACHE / "plot_vote5_dd_vs_vote5_vs_bh.png"
+    out = CACHE / "plots" / "plot_vote5_dd_vs_vote5_vs_bh.png"
     fig.savefig(out, dpi=130)
     print(f"\n  → {out}")
 
@@ -144,7 +144,7 @@ def main():
               f"{r['vote5_eq']:>9.3f} {r['dd_eq']:>8.3f} {r['bh_eq']:>8.3f} "
               f"{r['vote5_trades']:>13} {r['dd_trades']:>11}")
 
-    (CACHE / "plot_vote5_dd_summary.json").write_text(json.dumps(summary, indent=2))
+    (CACHE / "plots" / "plot_vote5_dd_summary.json").write_text(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":

@@ -155,18 +155,18 @@ def _simulate_sequential_oracle(signals, prices, lookahead, fee):
 # ── shared loader ────────────────────────────────────────────────────────────
 
 def _load_full(ticker: str):
-    pq    = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq    = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     meta  = load_meta(ticker)
     assert (pq["timestamp"].values == meta["timestamp"].values).all()
 
-    vol      = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol      = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_full = pd.Series(vol["atr"]).ffill().bfill().values.astype(np.float32)
     rk_full  = pd.Series(vol["rank"]).ffill().bfill().values.astype(np.float32)
     atr_med  = float(vol["atr_train_median"])
 
     dir_preds = {}
     for col in ["up_60", "down_60", "up_100", "down_100"]:
-        dir_preds[col] = np.load(CACHE / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]
+        dir_preds[col] = np.load(CACHE / "preds" / f"{ticker}_pred_dir_{col}_v4.npz")["preds"]
 
     pq_use   = pq.iloc[WARMUP:].reset_index(drop=True)
     meta_use = meta.iloc[WARMUP:].reset_index(drop=True)
@@ -175,7 +175,7 @@ def _load_full(ticker: str):
     df_full = _build_strategy_df(pq_use, meta_use, price, atr_full, rk_full,
                                    dir_preds)
 
-    rg = pd.read_parquet(CACHE / f"{ticker}_regime_cusum_v4.parquet")
+    rg = pd.read_parquet(CACHE / "preds" / f"{ticker}_regime_cusum_v4.parquet")
     return dict(pq_use=pq_use, meta_use=meta_use, price=price,
                 df_full=df_full, atr_full=atr_full, rk_full=rk_full,
                 atr_med=atr_med, regime_full=rg["state_name"].values,
@@ -247,7 +247,7 @@ def fee_free_walk_forward(d: dict, ticker: str):
                 ))
 
     df = pd.DataFrame(rows)
-    df.to_parquet(CACHE / f"{ticker}_diag_1a_fee_free.parquet", index=False)
+    df.to_parquet(CACHE / "lookup" / f"{ticker}_diag_1a_fee_free.parquet", index=False)
 
     # ── compare: per-strategy delta ──────────────────────────────────────────
     print(f"\n  Per-fold Sharpe: with-fee → fee-free  (Δ shown)")
@@ -336,7 +336,7 @@ def optimal_exit_oracle(d: dict, ticker: str):
                 ))
 
     df = pd.DataFrame(rows)
-    df.to_parquet(CACHE / f"{ticker}_diag_1b_oracle.parquet", index=False)
+    df.to_parquet(CACHE / "lookup" / f"{ticker}_diag_1b_oracle.parquet", index=False)
 
     print(f"\n  Oracle Sharpe (best exit within {ORACLE_LOOKAHEAD} bars), with-fee:")
     print(f"  {'strategy':<14} " + " ".join(f"{f'fold{i+1}':>8}" for i in range(N_FOLDS))

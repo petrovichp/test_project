@@ -73,7 +73,7 @@ def _eval_with_curve(policy_fn, sp, atr_median):
 
 
 def main():
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     # build VOTE5 policy factory + load FULL net once
@@ -99,7 +99,7 @@ def main():
     summary = []
 
     for ax, split in zip(axes, ["val", "test"]):
-        sp = np.load(CACHE / f"btc_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
         eq_full, sh_full, eq_f, nt_f = _eval_with_curve(make_full, sp, atr_median)
         eq_vote, sh_vote, eq_v, nt_v = _eval_with_curve(make_vote5, sp, atr_median)
         bh = sp["price"] / sp["price"][0]
@@ -134,7 +134,7 @@ def main():
     fig.suptitle("BASELINE_VOTE5 (K=5 plurality) vs BASELINE_FULL vs BTC B&H (fee=0)",
                  fontsize=13, y=0.995)
     fig.tight_layout()
-    out = CACHE / "plot_vote5_vs_baseline_vs_bh.png"
+    out = CACHE / "plots" / "plot_vote5_vs_baseline_vs_bh.png"
     fig.savefig(out, dpi=130)
     print(f"\n  → {out}")
 
@@ -146,7 +146,7 @@ def main():
               f"{r['full_eq']:>8.3f} {r['vote5_eq']:>9.3f} {r['bh_eq']:>8.3f} "
               f"{r['full_trades']:>12} {r['vote5_trades']:>13}")
 
-    (CACHE / "plot_vote5_summary.json").write_text(json.dumps(summary, indent=2))
+    (CACHE / "plots" / "plot_vote5_summary.json").write_text(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":

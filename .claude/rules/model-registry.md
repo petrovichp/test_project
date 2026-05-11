@@ -82,7 +82,7 @@ Use the metrics at the same fee setting as the model was trained at (typically f
 
 ### 2. Documentation
 
-- If the model is part of an existing experiment family (e.g. another seed for an existing baseline), add a row to that experiment's existing doc (`docs/voting_ensemble.md`, `docs/seed_variance.md`, etc.).
+- If the model is part of an existing experiment family (e.g. another seed for an existing baseline), add a row to that experiment's existing doc (`docs/experiments/voting_ensemble.md`, `docs/experiments/seed_variance.md`, etc.).
 - If the model is a new family / new hyperparameter / new architecture, create a fresh `docs/{experiment_name}.md` per the [experiments rule](experiments.md).
 - Cross-link the new doc from `CLAUDE.md`'s top-of-file doc list.
 
@@ -107,12 +107,12 @@ The registry currently contains only LGBM entries. **The DQN baselines and recen
 
 | Tag family | Models to register | Source for metrics |
 |---|---|---|
-| `BASELINE_FULL` + seeds | 5 entries (42, 7, 123, 0, 99) | [docs/baselines.md](../../docs/baselines.md), [docs/seed_variance.md](../../docs/seed_variance.md) |
-| `BASELINE_LEAN` | 1 entry | [docs/baselines.md](../../docs/baselines.md) |
-| `BASELINE_VOTE5` (ensemble) | 1 virtual entry | [docs/voting_ensemble.md](../../docs/voting_ensemble.md) |
-| `BASELINE_VOTE5_DISJOINT` (ensemble) + 5 members | 6 entries | [docs/voting_ensemble.md](../../docs/voting_ensemble.md) |
-| `VOTE5_DOUBLE`, `VOTE5_DUELING`, `VOTE5_DD` (+ seeds) | 18 entries | [docs/algo_test.md](../../docs/algo_test.md) |
-| `FEE4_p001`, `FEE4_p005` (+ seeds) | 10 entries | [docs/fee_aware_retrain.md](../../docs/fee_aware_retrain.md) |
-| `BASELINE_FULL_h128`, `_h256` (+ seeds) | several | [docs/capacity_test.md](../../docs/capacity_test.md) |
+| `BASELINE_FULL` + seeds | 5 entries (42, 7, 123, 0, 99) | [docs/reference/baselines.md](../../docs/reference/baselines.md), [docs/experiments/seed_variance.md](../../docs/experiments/seed_variance.md) |
+| `BASELINE_LEAN` | 1 entry | [docs/reference/baselines.md](../../docs/reference/baselines.md) |
+| `BASELINE_VOTE5` (ensemble) | 1 virtual entry | [docs/experiments/voting_ensemble.md](../../docs/experiments/voting_ensemble.md) |
+| `BASELINE_VOTE5_DISJOINT` (ensemble) + 5 members | 6 entries | [docs/experiments/voting_ensemble.md](../../docs/experiments/voting_ensemble.md) |
+| `VOTE5_DOUBLE`, `VOTE5_DUELING`, `VOTE5_DD` (+ seeds) | 18 entries | [docs/experiments/algo_test.md](../../docs/experiments/algo_test.md) |
+| `FEE4_p001`, `FEE4_p005` (+ seeds) | 10 entries | [docs/experiments/fee_aware_retrain.md](../../docs/experiments/fee_aware_retrain.md) |
+| `BASELINE_FULL_h128`, `_h256` (+ seeds) | several | [docs/experiments/capacity_test.md](../../docs/experiments/capacity_test.md) |
 
 Backfill can be a single dedicated commit titled `Backfill model_registry.json with all trained DQN policies`.

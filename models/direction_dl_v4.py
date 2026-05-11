@@ -121,7 +121,7 @@ def run(ticker: str = "btc"):
     print(f"\n{'='*70}\n  DIRECTION CNN-LSTM v4 — {ticker.upper()}\n{'='*70}")
 
     # ── load aligned source data ─────────────────────────────────────────────
-    pq        = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq        = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     feat_cols = [c for c in pq.columns if c != "timestamp"]
     sel_idx   = [feat_cols.index(f) for f in SEQ_FEATURES if f in feat_cols]
     miss      = [f for f in SEQ_FEATURES if f not in feat_cols]
@@ -141,7 +141,7 @@ def run(ticker: str = "btc"):
     assert nan_post == 0, f"NaN past warmup: {nan_post}"
 
     # vol-rank from npz: indexed from bar WARMUP
-    vol  = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol  = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     rank = vol["rank"]                                    # length 383,174 (bars 1,440 → end)
     assert len(rank) == n_full - WARMUP, "vol-rank length mismatch"
     rank_full = np.full(n_full, 0.5, dtype=np.float32)    # bars [0, 1440) → 0.5 placeholder
@@ -163,8 +163,8 @@ def run(ticker: str = "btc"):
         for d in ["up", "down"]:
             col   = f"{d}_{H}"
             label = f"{col}_v4"
-            mp    = CACHE / f"{ticker}_cnn2s_dir_{col}_v4.keras"
-            pp    = CACHE / f"{ticker}_pred_dir_{col}_v4.npz"
+            mp    = CACHE / "preds" / f"{ticker}_cnn2s_dir_{col}_v4.keras"
+            pp    = CACHE / "preds" / f"{ticker}_pred_dir_{col}_v4.npz"
 
             print(f"\n{'─'*70}\n  MODEL  {label}\n{'─'*70}")
 

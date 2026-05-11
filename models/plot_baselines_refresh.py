@@ -24,13 +24,13 @@ SEEDS = [42, 7, 123, 0, 99]
 
 def load_dqn(tag, hidden=64):
     n = DQN(50, 10, hidden)
-    n.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    n.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     n.eval(); return n
 
 
 def load_dueling(tag, hidden, state_dim, n_actions):
     n = DuelingDQN(state_dim, n_actions, hidden)
-    n.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    n.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     n.eval(); return n
 
 
@@ -81,7 +81,7 @@ def _eval_curve(policy_fn, sp, atr_median):
 
 
 def main():
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     vote5     = [load_dqn("BASELINE_FULL" if s == 42 else f"BASELINE_FULL_seed{s}") for s in SEEDS]
@@ -93,8 +93,8 @@ def main():
     summary = []
 
     for ax, split in zip(axes, ["val", "test"]):
-        sp_v5 = np.load(CACHE / f"btc_dqn_state_{split}.npz")
-        sp_v8 = np.load(CACHE / f"btc_dqn_state_{split}_v8_s11s13.npz")
+        sp_v5 = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
+        sp_v8 = np.load(CACHE / "state" / f"btc_dqn_state_{split}_v8_s11s13.npz")
         dates = pd.to_datetime(sp_v5["ts"], unit="s")
 
         # plot order: faded prior baselines first, headliners on top
@@ -132,7 +132,7 @@ def main():
     fig.suptitle("Refreshed baselines — 2026-05-11 (post C2 + Z2.1)  fee=0",
                  fontsize=13, y=0.995)
     fig.tight_layout()
-    out = CACHE / "plot_baselines_refresh.png"
+    out = CACHE / "plots" / "plot_baselines_refresh.png"
     fig.savefig(out, dpi=130)
     print(f"\n  → {out}")
 

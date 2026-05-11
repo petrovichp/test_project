@@ -1,6 +1,6 @@
 # C2 — VOTE5_v8 self-distillation (single-net imitator)
 
-Executed 2026-05-11. Path C2 from [development_plan.md](development_plan.md).
+Executed 2026-05-11. Path C2 from [development_plan.md](../reference/development_plan.md).
 
 ## Hypothesis
 

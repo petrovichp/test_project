@@ -178,4 +178,4 @@ The "trade count is the bottleneck" framing was right — but the lever isn't fi
 | File | Contents |
 |---|---|
 | [models/audit_vote5_dd.py](../models/audit_vote5_dd.py) | three-part audit + fee sweep + trade reduction |
-| `cache/audit_vote5_dd_results.json` | full per-trade log + fee sensitivity + reduction results |
+| `cache/results/audit_vote5_dd_results.json` | full per-trade log + fee sensitivity + reduction results |

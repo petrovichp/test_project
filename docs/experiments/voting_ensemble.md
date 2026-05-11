@@ -5,7 +5,7 @@
 ## Setup
 
 Trained 10 seeds total at identical hyperparameters: 42, 7, 123, 0, 99, 1, 13, 25, 50, 77. Evaluated 5 voting variants at K=5 and K=10:
-  - `q_avg`: Q-value averaging (re-tested for reference; same as `docs/ensemble_baseline.md`)
+  - `q_avg`: Q-value averaging (re-tested for reference; same as `docs/experiments/ensemble_baseline.md`)
   - `plurality`: most-common vote wins; tie → NO_TRADE
   - `majority_t`: top action wins if it has ≥t/K votes; else NO_TRADE
   - `unanimous`: top action wins only if ALL K voted for it; else NO_TRADE
@@ -91,7 +91,7 @@ import numpy as np
 nets = [load_net(t) for t in ['BASELINE_FULL', 'BASELINE_FULL_seed7',
         'BASELINE_FULL_seed123', 'BASELINE_FULL_seed0', 'BASELINE_FULL_seed99']]
 def make(): return _VotePolicy(nets, mode='plurality')
-atr = float(np.load('cache/btc_pred_vol_v4.npz')['atr_train_median'])
+atr = float(np.load('cache/preds/btc_pred_vol_v4.npz')['atr_train_median'])
 full = load_full_rl_period('btc')
 print('val :', eval_split(make(), 'val', atr))
 print('test:', eval_split(make(), 'test', atr))
@@ -117,11 +117,11 @@ To validate that voting is structurally better (not specific to these 5 seeds), 
 |---|---|
 | [models/voting_ensemble.py](../models/voting_ensemble.py) | full eval script: 10 variants, 6 folds, agreement histogram |
 | `cache/btc_dqn_policy_BASELINE_FULL_seed{1,13,25,50,77}.pt` | 5 additional seed policies |
-| `cache/voting_ensemble_results.json` | aggregated metrics |
+| `cache/results/voting_ensemble_results.json` | aggregated metrics |
 
 ## Implications for prior conclusions
 
-The audit follow-up's "no perturbation improved baseline" verdict is REVERSED for ensembling — voting at K=5 is a real improvement. The earlier ensemble doc (`docs/ensemble_baseline.md`) which concluded "ensembling does not improve baselines" was correct *only for Q-averaging*, the wrong aggregation choice.
+The audit follow-up's "no perturbation improved baseline" verdict is REVERSED for ensembling — voting at K=5 is a real improvement. The earlier ensemble doc (`docs/experiments/ensemble_baseline.md`) which concluded "ensembling does not improve baselines" was correct *only for Q-averaging*, the wrong aggregation choice.
 
 ---
 
@@ -196,4 +196,4 @@ Added as a formal baseline alongside BASELINE_VOTE5. **Best test, best fold 6**,
 | File | Contents |
 |---|---|
 | [models/vote_tier1.py](../models/vote_tier1.py) | Tier 1 follow-up: per-seed audit + 5 voting variants |
-| `cache/vote_tier1_results.json` | per-seed and per-variant metrics |
+| `cache/results/vote_tier1_results.json` | per-seed and per-variant metrics |

@@ -34,7 +34,7 @@ N_FOLDS = 6
 
 def load_net(tag: str) -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -47,7 +47,7 @@ def build_ensemble(seeds: list) -> EnsembleDQN:
 
 
 def eval_split(net, split: str, atr_median: float):
-    sp = np.load(CACHE / f"btc_dqn_state_{split}.npz")
+    sp = np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
     tp, sl, tr, tab, be, ts = _build_exit_arrays(sp["price"], sp["atr"], atr_median)
     out = evaluate_policy(net, sp["state"], sp["valid_actions"],
                            sp["signals"], sp["price"], tp, sl, tr, tab, be, ts,
@@ -59,7 +59,7 @@ def eval_split(net, split: str, atr_median: float):
 def load_full_rl_period(ticker: str = "btc"):
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"{ticker}_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"{ticker}_dqn_state_{split}.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr", "ts"):
             arrs.setdefault(key, []).append(sp[key])
     return {k: np.concatenate(arrs[k], axis=0) for k in arrs}
@@ -91,7 +91,7 @@ def eval_walkforward(net, atr_median: float, full):
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     full = load_full_rl_period("btc")
@@ -102,7 +102,7 @@ def main():
     # ── individual seed results (load from existing artefacts where possible) ──
     for s in ALL_SEEDS:
         tag = TAG_FOR[s]
-        if not (CACHE / f"btc_dqn_policy_{tag}.pt").exists():
+        if not (CACHE / "policies" / f"btc_dqn_policy_{tag}.pt").exists():
             print(f"  ! missing policy for seed={s} ({tag}); skipping")
             continue
         net = load_net(tag)
@@ -121,7 +121,7 @@ def main():
 
     # ── K=3 ensemble (seeds 42, 7, 123 — same set as seed_variance.md) ──
     K3 = [42, 7, 123]
-    if all((CACHE / f"btc_dqn_policy_{TAG_FOR[s]}.pt").exists() for s in K3):
+    if all((CACHE / "policies" / f"btc_dqn_policy_{TAG_FOR[s]}.pt").exists() for s in K3):
         ens3 = build_ensemble(K3)
         v = eval_split(ens3, "val",  atr_median)
         t = eval_split(ens3, "test", atr_median)
@@ -139,7 +139,7 @@ def main():
 
     # ── K=4 ensemble (drop the weakest val: seed=7) ──
     K4 = [42, 123, 0, 99]
-    if all((CACHE / f"btc_dqn_policy_{TAG_FOR[s]}.pt").exists() for s in K4):
+    if all((CACHE / "policies" / f"btc_dqn_policy_{TAG_FOR[s]}.pt").exists() for s in K4):
         ens4 = build_ensemble(K4)
         v = eval_split(ens4, "val",  atr_median)
         t = eval_split(ens4, "test", atr_median)
@@ -157,7 +157,7 @@ def main():
 
     # ── K=2 ensemble of top-2 by val (42, 123) ──
     K2 = [42, 123]
-    if all((CACHE / f"btc_dqn_policy_{TAG_FOR[s]}.pt").exists() for s in K2):
+    if all((CACHE / "policies" / f"btc_dqn_policy_{TAG_FOR[s]}.pt").exists() for s in K2):
         ens2 = build_ensemble(K2)
         v = eval_split(ens2, "val",  atr_median)
         t = eval_split(ens2, "test", atr_median)
@@ -175,7 +175,7 @@ def main():
 
     # ── K=5 ensemble ──
     K5 = ALL_SEEDS
-    if all((CACHE / f"btc_dqn_policy_{TAG_FOR[s]}.pt").exists() for s in K5):
+    if all((CACHE / "policies" / f"btc_dqn_policy_{TAG_FOR[s]}.pt").exists() for s in K5):
         ens5 = build_ensemble(K5)
         v = eval_split(ens5, "val",  atr_median)
         t = eval_split(ens5, "test", atr_median)
@@ -225,7 +225,7 @@ def main():
                   f"  Δ {ens[key]-means[key]:+7.3f}")
 
     # save
-    out = CACHE / "ensemble_baseline_results.json"
+    out = CACHE / "results" / "ensemble_baseline_results.json"
     out.write_text(json.dumps(results, indent=2, default=str))
     print(f"\n  → {out.name}    [{time.perf_counter()-t0:.1f}s]")
 

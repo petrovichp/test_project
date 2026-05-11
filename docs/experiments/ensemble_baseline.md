@@ -59,7 +59,7 @@ Net: ensemble lifts the weak-seed folds and drags the strong-seed folds toward t
 | **Rolling-Sharpe selection** | Pick which seed to use based on rolling Sharpe in recent K bars | Adapts to regime |
 | **Confidence-weighted Q** | Weight each net's Q by its in-sample certainty | More principled than uniform averaging |
 
-These are interesting but lower priority than the higher-leverage architectural test (direction probabilities into state — see [docs/seed_variance.md](seed_variance.md) recommendation).
+These are interesting but lower priority than the higher-leverage architectural test (direction probabilities into state — see [docs/experiments/seed_variance.md](seed_variance.md) recommendation).
 
 ## Files
 
@@ -68,4 +68,4 @@ These are interesting but lower priority than the higher-leverage architectural 
 | [models/dqn_network.py](../models/dqn_network.py) | added `EnsembleDQN` class (lines 38-50) |
 | [models/ensemble_baseline.py](../models/ensemble_baseline.py) | analysis script |
 | `cache/btc_dqn_policy_BASELINE_FULL_seed{0,99}.pt` | additional seed policies |
-| `cache/ensemble_baseline_results.json` | aggregated metrics |
+| `cache/results/ensemble_baseline_results.json` | aggregated metrics |

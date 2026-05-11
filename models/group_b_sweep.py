@@ -78,7 +78,7 @@ def run_cell(cell_id: str, fee: float, strat_filter: int,
                                       "rule-only:", "[step", "Early stop"]):
             print("    " + line)
 
-    hist_path = CACHE / f"{ticker}_exit_dqn_history_{cell_id}.json"
+    hist_path = CACHE / "policies" / f"{ticker}_exit_dqn_history_{cell_id}.json"
     if not hist_path.exists():
         return dict(cell_id=cell_id, fee=fee, strat_filter=strat_filter,
                      status="no_history", elapsed=elapsed)
@@ -137,7 +137,7 @@ def run(ticker: str = "btc", seed: int = 42, only_b4: bool = False,
         rows.append(run_cell(cid, fee, sf, ticker, seed))
     total_elapsed = time.perf_counter() - t_total
 
-    out_json = CACHE / f"{ticker}_exit_dqn_groupB_summary.json"
+    out_json = CACHE / "results" / f"{ticker}_exit_dqn_groupB_summary.json"
     out_json.write_text(json.dumps(rows, indent=2, default=str))
 
     # ── result table ───────────────────────────────────────────────────────

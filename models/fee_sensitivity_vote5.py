@@ -21,14 +21,14 @@ SEEDS = [42, 7, 123, 0, 99]
 
 def load_dqn(tag: str) -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     full = load_full_rl_period()
     nets = [load_dqn("BASELINE_FULL" if s == 42 else f"BASELINE_FULL_seed{s}") for s in SEEDS]
@@ -46,8 +46,8 @@ def main():
         rows_f, trades_f = run_walkforward(nets, full, atr_median, fee=fee, with_reason=False)
         wf = statistics.mean(r["sharpe"] for r in rows_f)
         wf_pos = sum(1 for r in rows_f if r["sharpe"] > 0)
-        sp_val = np.load(CACHE / "btc_dqn_state_val.npz")
-        sp_test = np.load(CACHE / "btc_dqn_state_test.npz")
+        sp_val = np.load(CACHE / "state" / "btc_dqn_state_val.npz")
+        sp_test = np.load(CACHE / "state" / "btc_dqn_state_test.npz")
         tp_v, sl_v, tr_v, tab_v, be_v, ts_v = _build_exit_arrays(sp_val["price"], sp_val["atr"], atr_median)
         tp_t, sl_t, tr_t, tab_t, be_t, ts_t = _build_exit_arrays(sp_test["price"], sp_test["atr"], atr_median)
         _, val_sh, _, _ = run_fold(sp_val["state"], sp_val["valid_actions"], sp_val["signals"],
@@ -75,8 +75,8 @@ def main():
                                               strat_allowlist=allowlist, with_reason=False)
         wf = statistics.mean(r["sharpe"] for r in rows_r)
         wf_pos = sum(1 for r in rows_r if r["sharpe"] > 0)
-        sp_val = np.load(CACHE / "btc_dqn_state_val.npz")
-        sp_test = np.load(CACHE / "btc_dqn_state_test.npz")
+        sp_val = np.load(CACHE / "state" / "btc_dqn_state_val.npz")
+        sp_test = np.load(CACHE / "state" / "btc_dqn_state_test.npz")
         tp_v, sl_v, tr_v, tab_v, be_v, ts_v = _build_exit_arrays(sp_val["price"], sp_val["atr"], atr_median)
         tp_t, sl_t, tr_t, tab_t, be_t, ts_t = _build_exit_arrays(sp_test["price"], sp_test["atr"], atr_median)
         _, val_sh, _, _ = run_fold(sp_val["state"], sp_val["valid_actions"], sp_val["signals"],
@@ -105,7 +105,7 @@ def main():
     measure("top-3 (S1, S7, S8)",                 allowlist={0, 5, 6})
     measure("top-5 + vote ≥ 3", vote_thr=3,       allowlist={0, 3, 5, 6, 7})
 
-    out = CACHE / "fee_sensitivity_vote5_results.json"
+    out = CACHE / "results" / "fee_sensitivity_vote5_results.json"
     out.write_text(json.dumps(dict(
         fee_sensitivity=fee_results,
         trade_reduction=rc_results,

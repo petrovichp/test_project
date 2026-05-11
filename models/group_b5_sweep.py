@@ -51,7 +51,7 @@ def run_cell(N: int, k: int, ticker: str = "btc", seed: int = 42,
                                       "Sharpe ", "Early stop"]):
             print("    " + line)
 
-    hist_path = CACHE / f"{ticker}_exit_dqn_fixed_history_{tag}.json"
+    hist_path = CACHE / "policies" / f"{ticker}_exit_dqn_fixed_history_{tag}.json"
     if not hist_path.exists():
         return dict(tag=tag, N=N, k=k, status="no_history", elapsed=elapsed)
     h = json.loads(hist_path.read_text())
@@ -98,7 +98,7 @@ def run(ticker: str = "btc", seed: int = 42, only_n: int = None,
         rows.append(run_cell(N, k, ticker, seed))
     total_elapsed = time.perf_counter() - t_total
 
-    out_json = CACHE / f"{ticker}_exit_dqn_fixed_groupB5_summary.json"
+    out_json = CACHE / "results" / f"{ticker}_exit_dqn_fixed_groupB5_summary.json"
     out_json.write_text(json.dumps(rows, indent=2, default=str))
 
     # ── result table grouped by window ──────────────────────────────────────

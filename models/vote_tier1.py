@@ -48,7 +48,7 @@ def _per_seed_eval(seed: int, atr_median, full):
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     full = load_full_rl_period("btc")
 
@@ -123,7 +123,7 @@ def main():
     print(f"  Δ ensemble vs best single   :                Δ  {disjoint_res['wf_mean']-per_seed[disjoint_best]['wf_mean']:+.3f}")
 
     # save
-    out = CACHE / "vote_tier1_results.json"
+    out = CACHE / "results" / "vote_tier1_results.json"
     out.write_text(json.dumps(dict(per_seed=per_seed, variants=results),
                                 indent=2, default=str))
     print(f"\n  → {out.name}    [{time.perf_counter()-t0:.1f}s]")

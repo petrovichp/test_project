@@ -105,7 +105,7 @@ ACTIONS_LABEL = ["NO_TRADE"] + STRAT_KEYS
 
 def _load_a2(ticker: str = "btc") -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"{ticker}_dqn_policy_A2.pt",
+    net.load_state_dict(torch.load(CACHE / "policies" / f"{ticker}_dqn_policy_A2.pt",
                                      map_location="cpu"))
     net.eval()
     return net
@@ -497,7 +497,7 @@ def _plot_equity(r_val, r_test, ticker: str, fee: float):
     ax_pos.grid(alpha=0.3); ax_pos.legend(loc="upper left", fontsize=9)
 
     plt.tight_layout()
-    out = CACHE / f"{ticker}_a2_rule_audit.png"
+    out = CACHE / "plots" / f"{ticker}_a2_rule_audit.png"
     plt.savefig(out, dpi=110, bbox_inches="tight")
     plt.close()
     print(f"\n  → equity plot: {out.name}")
@@ -508,14 +508,14 @@ def run(ticker: str = "btc", split: str = "both", fee: float = 0.0,
     print(f"\n{'='*78}\n  A2 + RULE-BASED EXITS — DEAL-BY-DEAL AUDIT  ({ticker.upper()})  fee={fee:.4f}\n{'='*78}")
     net = _load_a2(ticker)
     print(f"  loaded A2 policy: {sum(p.numel() for p in net.parameters()):,} params")
-    vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_med = float(vol["atr_train_median"])
 
     splits_to_run = ["val", "test"] if split == "both" else [split]
     results = {}
     for sp_name in splits_to_run:
         print(f"\n{'─'*78}\n  Split: {sp_name.upper()}\n{'─'*78}")
-        sp = np.load(CACHE / f"{ticker}_dqn_state_{sp_name}.npz")
+        sp = np.load(CACHE / "state" / f"{ticker}_dqn_state_{sp_name}.npz")
         t0 = time.perf_counter()
         r = trace_trades(net, sp, atr_med, fee=fee)
         print(f"  traced {len(r['trades'])} trades in {time.perf_counter()-t0:.1f}s")
@@ -524,7 +524,7 @@ def run(ticker: str = "btc", split: str = "both", fee: float = 0.0,
         results[sp_name] = r
 
         if save_trades:
-            out_csv = CACHE / f"{ticker}_a2_rule_trades_{sp_name}.csv"
+            out_csv = CACHE / "lookup" / f"{ticker}_a2_rule_trades_{sp_name}.csv"
             pd.DataFrame(r["trades"]).to_csv(out_csv, index=False)
             print(f"\n  → trade log: {out_csv.name}")
 

@@ -162,13 +162,13 @@ def run(ticker: str = "btc"):
     print(f"\n{'='*70}\n  DQN STATE BUILDER v5 — {ticker.upper()}\n{'='*70}")
 
     # ── load source data ─────────────────────────────────────────────────────
-    pq    = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    pq    = pd.read_parquet(CACHE / "features" / f"{ticker}_features_assembled.parquet")
     meta  = load_meta(ticker)
     assert (pq["timestamp"].values == meta["timestamp"].values).all()
     print(f"  feat parquet: {pq.shape}  meta: {meta.shape}")
 
     # vol preds (full bars WARMUP→end)
-    vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_full  = vol["atr"]            # length 383,174
     rank_full = vol["rank"]
     n_full    = len(atr_full)
@@ -182,7 +182,7 @@ def run(ticker: str = "btc"):
     rank_full = pd.Series(rank_full).ffill().bfill().values.astype(np.float32)
 
     # regime labels
-    rg = pd.read_parquet(CACHE / f"{ticker}_regime_cusum_v4.parquet")
+    rg = pd.read_parquet(CACHE / "preds" / f"{ticker}_regime_cusum_v4.parquet")
     assert len(rg) == n_full and (rg["timestamp"].values == pq["timestamp"].values[WARMUP:]).all()
     regime_names = rg["state_name"].values
     regime_oh    = np.zeros((n_full, 5), dtype=np.float32)
@@ -198,7 +198,7 @@ def run(ticker: str = "btc"):
     # ── direction preds v4 ───────────────────────────────────────────────────
     dir_preds = {}
     for col in ["up_60", "down_60", "up_100", "down_100"]:
-        d = np.load(CACHE / f"{ticker}_pred_dir_{col}_v4.npz")
+        d = np.load(CACHE / "preds" / f"{ticker}_pred_dir_{col}_v4.npz")
         a = d["preds"].astype(np.float32)
         assert len(a) == n_full, f"dir_{col} length {len(a)} != {n_full}"
         nan_n = np.isnan(a).sum()
@@ -258,7 +258,7 @@ def run(ticker: str = "btc"):
         stats[k] = {"median": m, "iqr": q}
         print(f"    {k:<16}  med={m:>+10.4f}  iqr={q:>+10.4f}")
 
-    out_json = CACHE / f"{ticker}_dqn_standardize_v5.json"
+    out_json = CACHE / "state" / f"{ticker}_dqn_standardize_v5.json"
     out_json.write_text(json.dumps(stats, indent=2))
     print(f"  → {out_json.name}")
 
@@ -322,7 +322,7 @@ def run(ticker: str = "btc"):
         sub_price = price_use[a:b]
         sub_sig   = sig_arr[a:b]
         np.savez(
-            CACHE / f"{ticker}_dqn_state_{nm}.npz",
+            CACHE / "state" / f"{ticker}_dqn_state_{nm}.npz",
             state         = sub_state,
             valid_actions = sub_valid,
             ts            = sub_ts.astype(np.int64),

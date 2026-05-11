@@ -476,7 +476,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h128_seed42.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=128); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=128); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h128_seed42.json"
   },
   "BASELINE_FULL_h128_seed7": {
@@ -497,7 +497,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h128_seed7.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=128); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=128); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h128_seed7.json"
   },
   "BASELINE_FULL_h128_seed123": {
@@ -518,7 +518,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h128_seed123.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=128); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=128); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h128_seed123.json"
   },
   "BASELINE_FULL_h128_seed0": {
@@ -539,7 +539,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h128_seed0.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=128); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=128); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h128_seed0.json"
   },
   "BASELINE_FULL_h128_seed99": {
@@ -560,7 +560,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h128_seed99.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=128); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=128); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h128_seed99.json"
   },
   "BASELINE_FULL_h256_seed42": {
@@ -581,7 +581,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h256_seed42.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=256); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=256); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h256_seed42.json"
   },
   "BASELINE_FULL_h256_seed7": {
@@ -602,7 +602,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h256_seed7.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=256); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=256); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h256_seed7.json"
   },
   "BASELINE_FULL_h256_seed123": {
@@ -623,7 +623,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h256_seed123.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=256); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=256); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h256_seed123.json"
   },
   "BASELINE_FULL_h256_seed0": {
@@ -644,7 +644,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h256_seed0.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=256); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=256); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h256_seed0.json"
   },
   "BASELINE_FULL_h256_seed99": {
@@ -665,7 +665,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_h256_seed99.pt",
     "trained_at": "2026-05-07",
-    "notes": "Capacity test member (h=256); see docs/capacity_test.md",
+    "notes": "Capacity test member (h=256); see docs/experiments/capacity_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_h256_seed99.json"
   },
   "BASELINE_FULL_V6_seed42": {
@@ -686,7 +686,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_V6_seed42.pt",
     "trained_at": "2026-05-07",
-    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/state_v6_test.md",
+    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/experiments/state_v6_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_V6_seed42.json"
   },
   "BASELINE_FULL_V6_seed7": {
@@ -707,7 +707,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_V6_seed7.pt",
     "trained_at": "2026-05-07",
-    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/state_v6_test.md",
+    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/experiments/state_v6_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_V6_seed7.json"
   },
   "BASELINE_FULL_V6_seed123": {
@@ -728,7 +728,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_V6_seed123.pt",
     "trained_at": "2026-05-07",
-    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/state_v6_test.md",
+    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/experiments/state_v6_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_V6_seed123.json"
   },
   "BASELINE_FULL_V6_seed0": {
@@ -749,7 +749,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_V6_seed0.pt",
     "trained_at": "2026-05-07",
-    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/state_v6_test.md",
+    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/experiments/state_v6_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_V6_seed0.json"
   },
   "BASELINE_FULL_V6_seed99": {
@@ -770,7 +770,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_BASELINE_FULL_V6_seed99.pt",
     "trained_at": "2026-05-07",
-    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/state_v6_test.md",
+    "notes": "State v6 (direction probs) test member; net negative \u2014 see docs/experiments/state_v6_test.md",
     "history_file": "btc_dqn_train_history_BASELINE_FULL_V6_seed99.json"
   },
   "VOTE5_DOUBLE_seed42": {
@@ -791,7 +791,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DOUBLE_seed42.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double DQN target; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Double DQN target; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DOUBLE_seed42.json"
   },
   "VOTE5_DOUBLE_seed7": {
@@ -812,7 +812,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DOUBLE_seed7.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double DQN target; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Double DQN target; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DOUBLE_seed7.json"
   },
   "VOTE5_DOUBLE_seed123": {
@@ -833,7 +833,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DOUBLE_seed123.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double DQN target; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Double DQN target; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DOUBLE_seed123.json"
   },
   "VOTE5_DOUBLE_seed0": {
@@ -854,7 +854,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DOUBLE_seed0.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double DQN target; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Double DQN target; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DOUBLE_seed0.json"
   },
   "VOTE5_DOUBLE_seed99": {
@@ -875,7 +875,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DOUBLE_seed99.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double DQN target; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Double DQN target; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DOUBLE_seed99.json"
   },
   "VOTE5_DUELING_seed42": {
@@ -896,7 +896,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DUELING_seed42.pt",
     "trained_at": "2026-05-07",
-    "notes": "Dueling DQN; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Dueling DQN; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DUELING_seed42.json"
   },
   "VOTE5_DUELING_seed7": {
@@ -917,7 +917,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DUELING_seed7.pt",
     "trained_at": "2026-05-07",
-    "notes": "Dueling DQN; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Dueling DQN; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DUELING_seed7.json"
   },
   "VOTE5_DUELING_seed123": {
@@ -938,7 +938,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DUELING_seed123.pt",
     "trained_at": "2026-05-07",
-    "notes": "Dueling DQN; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Dueling DQN; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DUELING_seed123.json"
   },
   "VOTE5_DUELING_seed0": {
@@ -959,7 +959,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DUELING_seed0.pt",
     "trained_at": "2026-05-07",
-    "notes": "Dueling DQN; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Dueling DQN; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DUELING_seed0.json"
   },
   "VOTE5_DUELING_seed99": {
@@ -980,7 +980,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DUELING_seed99.pt",
     "trained_at": "2026-05-07",
-    "notes": "Dueling DQN; ensemble member \u2014 see docs/algo_test.md",
+    "notes": "Dueling DQN; ensemble member \u2014 see docs/experiments/algo_test.md",
     "history_file": "btc_dqn_train_history_VOTE5_DUELING_seed99.json"
   },
   "VOTE5_DD_seed42": {
@@ -1001,7 +1001,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DD_seed42.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double_Dueling; ensemble member \u2014 see docs/algo_test.md, vote5_dd_audit.md",
+    "notes": "Double_Dueling; ensemble member \u2014 see docs/experiments/algo_test.md, vote5_dd_audit.md",
     "history_file": "btc_dqn_train_history_VOTE5_DD_seed42.json"
   },
   "VOTE5_DD_seed7": {
@@ -1022,7 +1022,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DD_seed7.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double_Dueling; ensemble member \u2014 see docs/algo_test.md, vote5_dd_audit.md",
+    "notes": "Double_Dueling; ensemble member \u2014 see docs/experiments/algo_test.md, vote5_dd_audit.md",
     "history_file": "btc_dqn_train_history_VOTE5_DD_seed7.json"
   },
   "VOTE5_DD_seed123": {
@@ -1043,7 +1043,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DD_seed123.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double_Dueling; ensemble member \u2014 see docs/algo_test.md, vote5_dd_audit.md",
+    "notes": "Double_Dueling; ensemble member \u2014 see docs/experiments/algo_test.md, vote5_dd_audit.md",
     "history_file": "btc_dqn_train_history_VOTE5_DD_seed123.json"
   },
   "VOTE5_DD_seed0": {
@@ -1064,7 +1064,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DD_seed0.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double_Dueling; ensemble member \u2014 see docs/algo_test.md, vote5_dd_audit.md",
+    "notes": "Double_Dueling; ensemble member \u2014 see docs/experiments/algo_test.md, vote5_dd_audit.md",
     "history_file": "btc_dqn_train_history_VOTE5_DD_seed0.json"
   },
   "VOTE5_DD_seed99": {
@@ -1085,7 +1085,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_VOTE5_DD_seed99.pt",
     "trained_at": "2026-05-07",
-    "notes": "Double_Dueling; ensemble member \u2014 see docs/algo_test.md, vote5_dd_audit.md",
+    "notes": "Double_Dueling; ensemble member \u2014 see docs/experiments/algo_test.md, vote5_dd_audit.md",
     "history_file": "btc_dqn_train_history_VOTE5_DD_seed99.json"
   },
   "FEE4_p001_seed42": {
@@ -1106,7 +1106,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_FEE4_p001_seed42.pt",
     "trained_at": "2026-05-09",
-    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/fee_aware_retrain.md",
+    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/experiments/fee_aware_retrain.md",
     "history_file": "btc_dqn_train_history_FEE4_p001_seed42.json"
   },
   "FEE4_p001_seed7": {
@@ -1127,7 +1127,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_FEE4_p001_seed7.pt",
     "trained_at": "2026-05-09",
-    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/fee_aware_retrain.md",
+    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/experiments/fee_aware_retrain.md",
     "history_file": "btc_dqn_train_history_FEE4_p001_seed7.json"
   },
   "FEE4_p001_seed123": {
@@ -1148,7 +1148,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_FEE4_p001_seed123.pt",
     "trained_at": "2026-05-09",
-    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/fee_aware_retrain.md",
+    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/experiments/fee_aware_retrain.md",
     "history_file": "btc_dqn_train_history_FEE4_p001_seed123.json"
   },
   "FEE4_p001_seed0": {
@@ -1169,7 +1169,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_FEE4_p001_seed0.pt",
     "trained_at": "2026-05-09",
-    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/fee_aware_retrain.md",
+    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/experiments/fee_aware_retrain.md",
     "history_file": "btc_dqn_train_history_FEE4_p001_seed0.json"
   },
   "FEE4_p001_seed99": {
@@ -1190,7 +1190,7 @@
     "wf_folds_positive": null,
     "model_file": "btc_dqn_policy_FEE4_p001_seed99.pt",
     "trained_at": "2026-05-09",
-    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/fee_aware_retrain.md",
+    "notes": "Fee-aware retrain (fee=4bp); ensemble member \u2014 see docs/experiments/fee_aware_retrain.md",
     "history_file": "btc_dqn_train_history_FEE4_p001_seed99.json"
   },
   "FEE4_p005_seed42": {

@@ -37,7 +37,7 @@ SEEDS   = [42, 7, 123, 0, 99]
 
 def load_net(tag: str) -> DQN:
     net = DQN(50, 10, 64)
-    net.load_state_dict(torch.load(CACHE / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(CACHE / "policies" / f"btc_dqn_policy_{tag}.pt", map_location="cpu"))
     net.eval()
     return net
 
@@ -45,8 +45,8 @@ def load_net(tag: str) -> DQN:
 def load_full_rl_period():
     arrs = {}
     for split in ("train", "val", "test"):
-        sp = np.load(CACHE / f"{ticker}_dqn_state_{split}.npz") if False else \
-             np.load(CACHE / f"btc_dqn_state_{split}.npz")
+        sp = np.load(CACHE / "state" / f"{ticker}_dqn_state_{split}.npz") if False else \
+             np.load(CACHE / "state" / f"btc_dqn_state_{split}.npz")
         for key in ("state", "valid_actions", "signals", "price", "atr",
                      "ts", "regime_id"):
             arrs.setdefault(key, []).append(sp[key])
@@ -128,7 +128,7 @@ def trace_vote5(state, valid, signals, prices, atr, regime_id, ts,
 
 def main():
     t0 = time.perf_counter()
-    vol = np.load(CACHE / "btc_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / "btc_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
     full = load_full_rl_period()
     nets = [load_net("BASELINE_FULL" if s == 42 else f"BASELINE_FULL_seed{s}") for s in SEEDS]
@@ -229,7 +229,7 @@ def main():
               f"long {n_long}/{n} ({n_long/n*100:>5.1f}%)  mean PnL {m:>+7.3f}%  win {win:>5.1f}%")
 
     # save full trade log
-    out = CACHE / "audit_vote5_trades.json"
+    out = CACHE / "results" / "audit_vote5_trades.json"
     out.write_text(json.dumps(dict(
         fold_meta=fold_meta,
         n_trades=len(all_trades),

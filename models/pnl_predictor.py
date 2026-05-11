@@ -160,7 +160,7 @@ def run(ticker: str = "btc"):
     print(f"\n{'='*72}\n  D1 — SUPERVISED PNL PREDICTOR  ({ticker.upper()})\n{'='*72}")
 
     # ── load DQN-train/val/test arrays ───────────────────────────────────────
-    arr = {nm: np.load(CACHE / f"{ticker}_dqn_state_{nm}.npz")
+    arr = {nm: np.load(CACHE / "state" / f"{ticker}_dqn_state_{nm}.npz")
            for nm in ["train", "val", "test"]}
     print(f"  splits: " + "  ".join(f"{nm}={arr[nm]['state'].shape[0]:,}"
                                        for nm in arr))
@@ -175,7 +175,7 @@ def run(ticker: str = "btc"):
     # train [100000, 280000), val [280000, 330867), test [330867, 383174)
     dir_arrays_full = []
     for col in DIR_COLS:
-        d = np.load(CACHE / f"{ticker}_pred_dir_{col}_v4.npz")
+        d = np.load(CACHE / "preds" / f"{ticker}_pred_dir_{col}_v4.npz")
         dir_arrays_full.append(d["preds"])      # length 383174
     dir_pred_full = np.stack(dir_arrays_full, axis=1)
     splits = dict(train=(100_000, 280_000),
@@ -188,7 +188,7 @@ def run(ticker: str = "btc"):
         print(f"    dir preds {nm}: {dir_per_split[nm].shape}")
 
     # ── ATR-train median for exit arrays ─────────────────────────────────────
-    vol = np.load(CACHE / f"{ticker}_pred_vol_v4.npz")
+    vol = np.load(CACHE / "preds" / f"{ticker}_pred_vol_v4.npz")
     atr_median = float(vol["atr_train_median"])
 
     # ── pre-compute exit arrays per split ────────────────────────────────────
@@ -239,7 +239,7 @@ def run(ticker: str = "btc"):
             callbacks=[lgb.early_stopping(30, verbose=False),
                         lgb.log_evaluation(-1)],
         )
-        model.save_model(str(CACHE / f"{ticker}_pnl_pred_{key}.txt"))
+        model.save_model(str(CACHE / "preds" / f"{ticker}_pnl_pred_{key}.txt"))
 
         # val + test datasets for THIS strategy
         ev = exit_arrs["val"]
@@ -314,11 +314,11 @@ def run(ticker: str = "btc"):
               f"({scan['n_trades']}→{gated_te['n_trades']} test trades)")
 
     # ── save thresholds + results ────────────────────────────────────────────
-    json_path = CACHE / f"{ticker}_pnl_pred_thresholds.json"
+    json_path = CACHE / "lookup" / f"{ticker}_pnl_pred_thresholds.json"
     json_path.write_text(json.dumps(thresholds, indent=2))
 
     df = pd.DataFrame(results)
-    df.to_parquet(CACHE / f"{ticker}_pnl_pred_results.parquet", index=False)
+    df.to_parquet(CACHE / "lookup" / f"{ticker}_pnl_pred_results.parquet", index=False)
 
     # ── summary tables ───────────────────────────────────────────────────────
     print(f"\n\n{'='*72}\n  SUMMARY — PNL-PREDICTOR GATE vs NO GATE\n{'='*72}")

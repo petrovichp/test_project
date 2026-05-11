@@ -1,6 +1,6 @@
 # Experiments Remaining + Next Steps
 
-Forward-looking plan after Group A breakthrough and Group B closeout. Companion to [RESULTS.md](../RESULTS.md) and [experiments_log.md](experiments_log.md).
+Forward-looking plan after Group A breakthrough and Group B closeout. Companion to [RESULTS.md](../RESULTS.md) and [experiments_log.md](../reference/experiments_log.md).
 
 ---
 
@@ -45,7 +45,7 @@ Tested in May 2026: 12 cells (3 global × fee level + 9 per-strategy at maker).
 - **B4 (per-strategy):** **6/9 strategies improve, mean Δ +0.6, best +1.97** (S8_TakerFlow). Real but small — well below the +4-Sharpe gate set as the success criterion.
 - **C1 (A4 entry + B4 exits, sequential composition):** **does not transfer**. Δ −0.07 val, −0.89 test. B4 was trained on a "sequential first-firing" entry distribution; A4's selective entries (~3% of bars) have different in-trade dynamics, and B4's policy bails too eagerly on them.
 
-Full numbers in [experiments_log.md § Group B](experiments_log.md#group-b--exit-timing-dqn) and [§ Group C1](experiments_log.md#group-c1--a4-entry--b4-per-strategy-exits-sequential-composition).
+Full numbers in [experiments_log.md § Group B](../reference/experiments_log.md#group-b--exit-timing-dqn) and [§ Group C1](../reference/experiments_log.md#group-c1--a4-entry--b4-per-strategy-exits-sequential-composition).
 
 Lesson: the +28-Sharpe oracle gap most likely lives in *intra-bar entry timing* (sub-1-minute resolution that the current architecture cannot see), not in exit selection. Future exit work would need a different formulation than HOLD/EXIT_NOW (e.g., dynamic SL placement, signal-driven exit thresholds inside the strategies themselves), and would need to be co-trained with the entry policy to avoid the C1 transfer failure.
 

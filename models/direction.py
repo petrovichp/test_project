@@ -76,7 +76,7 @@ _LGB_PARAMS = {
 
 
 def _model_path(ticker: str, label: str) -> Path:
-    return CACHE_DIR / f"{ticker}_direction_lgbm_{label}.txt"
+    return CACHE_DIR / "preds" / f"{ticker}_direction_lgbm_{label}.txt"
 
 
 def _train(X_tr, y_tr, X_val, y_val, save_path: Path = None):
@@ -206,7 +206,7 @@ def run(ticker: str = "btc"):
     print(f"  WALK-FORWARD — up_60")
     print(f"{'='*60}")
 
-    assembled = pd.read_parquet(CACHE_DIR / f"{ticker}_features_assembled.parquet")
+    assembled = pd.read_parquet(CACHE_DIR / "features" / f"{ticker}_features_assembled.parquet")
     fc_all    = [c for c in assembled.columns if c != "timestamp"]
     meta_ts   = meta["timestamp"].values
     gap_ok    = _cmask(pd.Series(meta_ts), max_lookback=1440)
@@ -251,7 +251,7 @@ def run(ticker: str = "btc"):
 
     # save
     df  = pd.DataFrame(rows)
-    out = CACHE_DIR / f"{ticker}_direction_eval.parquet"
+    out = CACHE_DIR / "lookup" / f"{ticker}_direction_eval.parquet"
     df.to_parquet(out, index=False)
 
     print(f"\n\n── Summary ──────────────────────────────────────────────────────")
