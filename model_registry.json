@@ -3201,5 +3201,109 @@
     "wf_folds_positive": 6, "n_trades_test": 272,
     "trained_at": "2026-05-11",
     "notes": "C2 — 5-seed plurality of distilled students. UNDERPERFORMS individual seeds because correlated students vote together (no diversity benefit). Single distilled net beats voting of distilled nets."
+  },
+  "VOTE5_v8_H256_DD_eth_seed42": {
+    "ticker": "eth", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_eth_seed42", "seed": 42,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ablate_actions": [],
+    "ensemble_role": "VOTE5_v8_H256_DD_eth_seed42",
+    "val_sharpe_single_greedy": -15.088,
+    "model_file": "eth_dqn_policy_VOTE5_v8_H256_DD_eth_seed42.pt",
+    "trained_at": "2026-05-11",
+    "notes": "Z2.1 cross-asset — ETH. Single-seed greedy val is negative; ensemble plurality is positive."
+  },
+  "VOTE5_v8_H256_DD_eth_seed7": {
+    "ticker": "eth", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_eth_seed7", "seed": 7,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ensemble_role": "VOTE5_v8_H256_DD_eth_seed7",
+    "val_sharpe_single_greedy": -12.185,
+    "model_file": "eth_dqn_policy_VOTE5_v8_H256_DD_eth_seed7.pt",
+    "trained_at": "2026-05-11", "notes": "Z2.1 cross-asset — ETH"
+  },
+  "VOTE5_v8_H256_DD_eth_seed123": {
+    "ticker": "eth", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_eth_seed123", "seed": 123,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ensemble_role": "VOTE5_v8_H256_DD_eth_seed123",
+    "val_sharpe_single_greedy": -11.640,
+    "model_file": "eth_dqn_policy_VOTE5_v8_H256_DD_eth_seed123.pt",
+    "trained_at": "2026-05-11", "notes": "Z2.1 cross-asset — ETH"
+  },
+  "VOTE5_v8_H256_DD_eth_seed0": {
+    "ticker": "eth", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_eth_seed0", "seed": 0,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ensemble_role": "VOTE5_v8_H256_DD_eth_seed0",
+    "val_sharpe_single_greedy": -13.738,
+    "model_file": "eth_dqn_policy_VOTE5_v8_H256_DD_eth_seed0.pt",
+    "trained_at": "2026-05-11", "notes": "Z2.1 cross-asset — ETH"
+  },
+  "VOTE5_v8_H256_DD_eth_seed99": {
+    "ticker": "eth", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_eth_seed99", "seed": 99,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ensemble_role": "VOTE5_v8_H256_DD_eth_seed99",
+    "val_sharpe_single_greedy": -6.795,
+    "model_file": "eth_dqn_policy_VOTE5_v8_H256_DD_eth_seed99.pt",
+    "trained_at": "2026-05-11", "notes": "Z2.1 cross-asset — ETH"
+  },
+  "VOTE5_v8_H256_DD_eth": {
+    "ticker": "eth", "model_type": "ensemble", "tag": "VOTE5_v8_H256_DD_eth",
+    "ensemble_mode": "plurality",
+    "members": ["VOTE5_v8_H256_DD_eth_seed42", "VOTE5_v8_H256_DD_eth_seed7",
+                "VOTE5_v8_H256_DD_eth_seed123", "VOTE5_v8_H256_DD_eth_seed0",
+                "VOTE5_v8_H256_DD_eth_seed99"],
+    "val_sharpe": 5.565, "test_sharpe": -0.086, "wf_mean_sharpe": 7.218,
+    "wf_folds_positive": 5, "n_trades_test": 79, "n_trades_val": 123,
+    "trained_at": "2026-05-11",
+    "notes": "Z2.1 — ETH cross-asset. WF +7.22, val +5.57, test -0.09. Strategy stack transfers at ensemble level (5/6 folds positive) but loses on test (most recent period). Single-seed greedy training all negative; plurality vote recovers positive Sharpe via defensive filtering."
+  },
+  "VOTE5_v8_H256_DD_sol_seed42": {
+    "ticker": "sol", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_sol_seed42", "seed": 42,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ensemble_role": "VOTE5_v8_H256_DD_sol_seed42",
+    "val_sharpe_single_greedy": -16.326,
+    "model_file": "sol_dqn_policy_VOTE5_v8_H256_DD_sol_seed42.pt",
+    "trained_at": "2026-05-11", "notes": "Z2.1 cross-asset — SOL"
+  },
+  "VOTE5_v8_H256_DD_sol_seed7": {
+    "ticker": "sol", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_sol_seed7", "seed": 7,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ensemble_role": "VOTE5_v8_H256_DD_sol_seed7",
+    "val_sharpe_single_greedy": -11.464,
+    "model_file": "sol_dqn_policy_VOTE5_v8_H256_DD_sol_seed7.pt",
+    "trained_at": "2026-05-11", "notes": "Z2.1 cross-asset — SOL"
+  },
+  "VOTE5_v8_H256_DD_sol_seed123": {
+    "ticker": "sol", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_sol_seed123", "seed": 123,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ensemble_role": "VOTE5_v8_H256_DD_sol_seed123",
+    "val_sharpe_single_greedy": -12.885,
+    "model_file": "sol_dqn_policy_VOTE5_v8_H256_DD_sol_seed123.pt",
+    "trained_at": "2026-05-11", "notes": "Z2.1 cross-asset — SOL"
+  },
+  "VOTE5_v8_H256_DD_sol_seed0": {
+    "ticker": "sol", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_sol_seed0", "seed": 0,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ensemble_role": "VOTE5_v8_H256_DD_sol_seed0",
+    "val_sharpe_single_greedy": -11.619,
+    "model_file": "sol_dqn_policy_VOTE5_v8_H256_DD_sol_seed0.pt",
+    "trained_at": "2026-05-11", "notes": "Z2.1 cross-asset — SOL"
+  },
+  "VOTE5_v8_H256_DD_sol_seed99": {
+    "ticker": "sol", "model_type": "dqn", "tag": "VOTE5_v8_H256_DD_sol_seed99", "seed": 99,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v8_s11s13",
+    "fee_train": 0.0, "trade_penalty": 0.001, "ensemble_role": "VOTE5_v8_H256_DD_sol_seed99",
+    "val_sharpe_single_greedy": -13.037,
+    "model_file": "sol_dqn_policy_VOTE5_v8_H256_DD_sol_seed99.pt",
+    "trained_at": "2026-05-11", "notes": "Z2.1 cross-asset — SOL"
+  },
+  "VOTE5_v8_H256_DD_sol": {
+    "ticker": "sol", "model_type": "ensemble", "tag": "VOTE5_v8_H256_DD_sol",
+    "ensemble_mode": "plurality",
+    "members": ["VOTE5_v8_H256_DD_sol_seed42", "VOTE5_v8_H256_DD_sol_seed7",
+                "VOTE5_v8_H256_DD_sol_seed123", "VOTE5_v8_H256_DD_sol_seed0",
+                "VOTE5_v8_H256_DD_sol_seed99"],
+    "val_sharpe": 4.160, "test_sharpe": 2.185, "wf_mean_sharpe": 8.236,
+    "wf_folds_positive": 6, "n_trades_test": 301, "n_trades_val": 457,
+    "trained_at": "2026-05-11",
+    "notes": "Z2.1 — SOL cross-asset. WF +8.24, val +4.16, test +2.19, 6/6 folds positive. Best cross-asset transfer of the two non-BTC tickers."
   }
 }

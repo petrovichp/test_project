@@ -9,9 +9,9 @@ Differences from v5:
 Approach: load v5 state files (which already have all 9 existing strategy signals),
 compute S11 + S13 signals on the same data, append, save as v8.
 
-Run: python3 -m models.build_state_v8
+Run: python3 -m models.build_state_v8 [ticker]
 """
-import json, pathlib, time
+import json, pathlib, sys, time
 import numpy as np
 import pandas as pd
 
@@ -41,20 +41,20 @@ def _build_strategy_df(price, atr, pq_use, meta_use):
     return df
 
 
-def main():
+def main(ticker: str = "btc"):
     t0 = time.perf_counter()
-    print(f"\n{'='*70}\n  Build v8 state — append S11_Basis + S13_OBDiv\n{'='*70}")
+    print(f"\n{'='*70}\n  Build v8 state — append S11_Basis + S13_OBDiv  ({ticker.upper()})\n{'='*70}")
 
     # Load existing v5 state for all 3 splits
     splits = ["train", "val", "test"]
-    data = {nm: np.load(CACHE / f"btc_dqn_state_{nm}.npz") for nm in splits}
+    data = {nm: np.load(CACHE / f"{ticker}_dqn_state_{nm}.npz") for nm in splits}
     sizes = [data[nm]["state"].shape[0] for nm in splits]
     print(f"  v5 sizes: train={sizes[0]:,}  val={sizes[1]:,}  test={sizes[2]:,}")
 
     # Load features parquet + meta — needed for S11/S13 signal computation
     print(f"  Loading features parquet + meta ...")
-    pq   = pd.read_parquet(CACHE / "btc_features_assembled.parquet")
-    meta = load_meta("btc")
+    pq   = pd.read_parquet(CACHE / f"{ticker}_features_assembled.parquet")
+    meta = load_meta(ticker)
     ts_pq   = pq["timestamp"].values
     ts_meta = meta["timestamp"].values
     assert (ts_pq == ts_meta).all(), "timestamp misalignment"
@@ -113,7 +113,7 @@ def main():
         assert new_valid.shape   == (sizes[splits.index(nm)], 12), new_valid.shape
         assert new_state.shape   == (sizes[splits.index(nm)], 52), new_state.shape
 
-        out = CACHE / f"btc_dqn_state_{nm}_v8_s11s13.npz"
+        out = CACHE / f"{ticker}_dqn_state_{nm}_v8_s11s13.npz"
         np.savez(
             out,
             state         = new_state,
@@ -137,4 +137,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1] if len(sys.argv) > 1 else "btc")
