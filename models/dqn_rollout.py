@@ -50,7 +50,9 @@ DQN_TRAIN_E  = 281_440
 DQN_VAL_E    = 332_307
 STRAT_KEYS   = ["S1_VolDir", "S2_Funding", "S3_BBRevert", "S4_MACDTrend",
                 "S6_TwoSignal", "S7_OIDiverg", "S8_TakerFlow",
-                "S10_Squeeze", "S12_VWAPVol"]
+                "S10_Squeeze", "S12_VWAPVol",
+                # Z3 Step 4 additions (2026-05-11):
+                "S11_Basis", "S13_OBDiv"]
 
 
 # ── exit-array builder ───────────────────────────────────────────────────────

@@ -302,18 +302,20 @@ def train(ticker: str = "btc", seed: int = 42, action_mode: str = "all",
     # ── networks + optimizer + buffer ────────────────────────────────────────
     use_dueling = algo in ("dueling", "double_dueling")
     use_double  = algo in ("double",  "double_dueling")
-    print(f"  hidden_size={hidden}  algo={algo}  (dueling={use_dueling}, double={use_double})")
+    n_actions   = int(sp_tr["valid_actions"].shape[1])    # dynamic — supports v8 (12 actions)
+    print(f"  hidden_size={hidden}  algo={algo}  n_actions={n_actions}  "
+          f"(dueling={use_dueling}, double={use_double})")
     if use_dueling:
         from models.dqn_network import DuelingDQN
-        online = DuelingDQN(state_dim=state_dim, n_actions=10, hidden=hidden)
-        target = DuelingDQN(state_dim=state_dim, n_actions=10, hidden=hidden)
+        online = DuelingDQN(state_dim=state_dim, n_actions=n_actions, hidden=hidden)
+        target = DuelingDQN(state_dim=state_dim, n_actions=n_actions, hidden=hidden)
     else:
-        online = DQN(state_dim=state_dim, n_actions=10, hidden=hidden)
-        target = DQN(state_dim=state_dim, n_actions=10, hidden=hidden)
+        online = DQN(state_dim=state_dim, n_actions=n_actions, hidden=hidden)
+        target = DQN(state_dim=state_dim, n_actions=n_actions, hidden=hidden)
     target.load_state_dict(online.state_dict())
     target.eval()
     optimizer = torch.optim.Adam(online.parameters(), lr=LR)
-    buf = ReplayBuffer(capacity=BUFFER_SIZE, state_dim=state_dim, n_actions=10)
+    buf = ReplayBuffer(capacity=BUFFER_SIZE, state_dim=state_dim, n_actions=n_actions)
 
     print(f"  online net params: {online.n_params():,}  optimizer Adam lr={LR}")
 
@@ -473,8 +475,10 @@ if __name__ == "__main__":
                      help="comma-separated action indices [1..9] to mask during training "
                           "(e.g. '5' masks S6_TwoSignal, '5,8' masks S6+S10)")
     ap.add_argument("--state-version", default="v5", dest="state_version",
-                     choices=["v5", "v6"],
-                     help="state-array version: v5=50-dim (default), v6=54-dim with direction probs")
+                     choices=["v5", "v6", "v7_pa", "v7_basis", "v8_s11s13"],
+                     help="state-array version: v5=50-dim (default), v6=54-dim with direction probs, "
+                          "v7_pa=54-dim with price-action context, v7_basis=55-dim with basis+funding, "
+                          "v8_s11s13=52-dim with S11+S13 strategy flags + 12-action space")
     ap.add_argument("--hidden", type=int, default=64,
                      help="DQN hidden layer size (default 64; larger for capacity test)")
     ap.add_argument("--algo", default="dqn",

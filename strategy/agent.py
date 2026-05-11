@@ -485,9 +485,13 @@ STRATEGIES = {
     "S8_TakerFlow": (strategy_8,  "Sustained Taker Flow Momentum"),
     "S10_Squeeze":  (strategy_10, "Vol Squeeze Breakout"),
     "S12_VWAPVol":  (strategy_12, "VWAP Deviation + Volume"),
-    # Killed (Sharpe < -20 on both splits, no recoverable signal):
-    #   S5_OFIScalp, S9_LargeOrd, S11_Basis, S13_OBDiv
-    # Strategy functions kept in this file as dead code for reference.
+    # Resurrected 2026-05-11 (Z3 Step 1 + Step 4): unique signal types not in current 9.
+    # Standalone Sharpes (val/test): S11 -5.66/-8.28, S13 -2.81/-2.81 — similar to
+    # currently-used S2/S10 which are weak standalone but useful in DQN action space.
+    "S11_Basis":    (strategy_11, "Basis Momentum (perp-spot z-score)"),
+    "S13_OBDiv":    (strategy_13, "Spot/Perp OB Imbalance Disagreement"),
+    # Killed (overlap with S8 / spot_imbalance, worse standalone):
+    #   S5_OFIScalp, S9_LargeOrd
 }
 
 DEFAULT_PARAMS = {
@@ -514,4 +518,8 @@ DEFAULT_PARAMS = {
                      "tp_pct": 0.030, "sl_pct": 0.008, "trail_pct": 0.010},
     "S12_VWAPVol":  {"vwap_thresh": 0.008, "vol_sigma": 1.0, "vol_ceil": 0.60,
                      "tp_pct": 0.015, "sl_pct": 0.006, "trail_pct": 0.0},
+    "S11_Basis":    {"basis_sigma": 1.5,                       # basis momentum: small TP, mean-reverting tendency
+                     "tp_pct": 0.015, "sl_pct": 0.006, "trail_pct": 0.0},
+    "S13_OBDiv":    {"imb_thresh": 0.10,                       # OB disagreement: tight bounds, microstructure
+                     "tp_pct": 0.012, "sl_pct": 0.006, "trail_pct": 0.0},
 }

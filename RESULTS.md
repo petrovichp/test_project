@@ -1,5 +1,10 @@
 # Crypto Trading ML — Results & Conclusions
 
+> **Status (2026-05-11, post Z2+Z3 Steps 2/3/4 — new baseline VOTE5_v8_H256_DD):**
+> - **Step 4 WIN — `VOTE5_v8_H256_DD` PROMOTED as new primary baseline** ([docs/z2_z3_results.md](docs/z2_z3_results.md)). Added S11_Basis + S13_OBDiv to action space (10 → 12 actions). WF mean Sharpe **+12.07** (vs prior +11.05, Δ +1.02), val **+6.67** (Δ +3.46), 6/6 folds positive. Test dropped (+9.01 → +4.44, Δ −4.57) — real cost — but WF aggregate is up and val resilience is materially better. The "killed" verdict on S11/S13 from earlier work was based on standalone Sharpe only; in the DQN action space they prove their value by covering signal types not in the original 9.
+> - **Step 2 NEGATIVE** — price-action context features (drawdown_60, runup_60, realized_vol_60, vol_ratio_30_60) hurt the policy: WF dropped −1.87 to +9.18, val collapsed to −1.49, fold 5 turned negative. Features were redundant with regime + ATR + windowed price already in state. Drop v7_pa.
+> - **Step 3 PARTIAL** — basis + funding state (basis_z_60, basis_change_1bar, funding_apr, funding_z_120, oi_change_60) confirmed the val-resilience hypothesis: val nearly doubled (+3.21 → +6.05), but test (-6.11) and fold-6 (−5.92) regressed. WF lifted +0.61. Retained as alternative baseline `VOTE5_v7basis_H256_DD` for val-robustness-prioritized deployments. Suggests Step 5 (combine v8 action space + v7_basis state) could capture both wins.
+>
 > **Status (2026-05-11, post Z3 Step 1):**
 > - **Z3 Step 1 — DIAGNOSTIC** ([docs/z3_step1_killed_strategies.md](docs/z3_step1_killed_strategies.md)). Standalone-validated the 4 "killed" strategies (S5, S9, S11, S13). Actual Sharpes (val/test): S5 −5.15/−17.37, S9 −5.39/−11.72, S11 −5.66/−8.28, S13 −2.81/−2.81. The original "Sharpe < −20" comment is **outdated** — current values are in line with the worst currently-used strategies (S3 val −28, S7 val −19.4 are both DQN-active). **Verdict**: drop S5, S9 (redundant with S8 + already-captured signals). Keep S11 (basis momentum, unique signal) and S13 (cross-instrument OB, unique signal) for Step 4 retrain — expand action space from 10 → 12 actions.
 >

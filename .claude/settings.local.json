@@ -12,7 +12,12 @@
       "WebFetch(domain:www.okx.com)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(git commit -m 'Expand Z3 \\(new strategies\\) + Z4 \\(architecture\\) with detailed sub-plans *)",
+      "Bash(git commit -m 'Expand all phase sub-plans with detail parity \\(Z1, Z2, Z5, Path F\\) *)",
+      "WebFetch(domain:developers.binance.com)",
+      "WebFetch(domain:docs.chainstack.com)",
+      "WebFetch(domain:hyperliquid.gitbook.io)"
     ]
   }
 }

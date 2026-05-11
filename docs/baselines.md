@@ -1,27 +1,57 @@
 # Baselines — reference systems for all future experiments
 
-> Refreshed 2026-05-10 after Phase Z1: **`VOTE5_H256_DD` is the new primary baseline.** Reproducible end-to-end from the data files in `cache/` and the commands below. All future experiments report deltas vs `VOTE5_H256_DD` (strongest) and may include the others for context.
+> Refreshed 2026-05-11 after Phase Z3 Step 4: **`VOTE5_v8_H256_DD` is the new primary baseline** (12-action: S11_Basis + S13_OBDiv added). Reproducible end-to-end from the data files in `cache/` and the commands below. All future experiments report deltas vs `VOTE5_v8_H256_DD` (strongest) and may include the others for context.
 
 ## Quick comparison
 
-| Metric | ⭐ **VOTE5_H256_DD** | **VOTE5** | **VOTE5_H256** | **VOTE5_DISJOINT** | **VOTE5_DD** | **FULL** | **LEAN** |
-|---|---|---|---|---|---|---|---|
-| Type | h=256 + Double_Dueling | h=64 plurality | h=256 plurality | h=64 plurality | h=64 + DD plurality | Single DQN | Single DQN |
-| Constituents | 5 seeds: 42,7,123,0,99 | same 5 seeds | same 5 seeds, h=256 | seeds 1,13,25,50,77 | same 5 seeds, DD | seed 42 | seed 42 |
-| Net params per seed | ~96k | 5,674 | 47,242 | 5,674 | ~6k | 5,674 | 5,674 |
-| **Walk-forward mean Sharpe** | **+11.05** | +10.40 | +11.86 | +10.06 | +6.80 | +9.034 | +6.756 |
-| Walk-forward folds positive | **6/6** | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 |
-| Fold 6 Sharpe | **+8.23** | +5.20 | +0.41 | +6.11 | +4.58 | +2.33 | +3.09 |
-| DQN-val Sharpe | +3.21 | +3.53 | +3.32 | +3.79 | **+6.12** | **+7.295** | +4.662 |
-| DQN-test Sharpe | **+9.01** | +4.19 | +1.21 | +6.45 | +5.91 | +3.666 | +5.192 |
-| Trades (full RL period) | 1,372 | 1,122 | — | 1,292 | 1,437 | — | — |
-| Profile | **best test + fold-6** | balanced h=64 | aggregate WF | best test (h=64) | val regularization | best val (single) | regime alt |
+| Metric | ⭐ **VOTE5_v8_H256_DD** | **VOTE5_v7basis_H256_DD** | **VOTE5_H256_DD** | **VOTE5** | **VOTE5_H256** | **VOTE5_DD** |
+|---|---|---|---|---|---|---|
+| Type | h=256 + DD, **12-action** (S11/S13 added) | h=256 + DD, basis+funding state | h=256 + Double_Dueling | h=64 plurality | h=256 plurality | h=64 + DD plurality |
+| State version | v8_s11s13 (52-dim) | v7_basis (55-dim) | v5 (50-dim) | v5 | v5 | v5 |
+| Constituents | 5 seeds: 42,7,123,0,99 | same | same | same | same | same |
+| **Walk-forward mean Sharpe** | **+12.07** | +11.66 | +11.05 | +10.40 | +11.86 | +6.80 |
+| Walk-forward folds positive | **6/6** | 6/6 | 6/6 | 6/6 | 6/6 | 6/6 |
+| Fold 6 Sharpe | +4.44 | +2.31 | **+8.23** | +5.20 | +0.41 | +4.58 |
+| DQN-val Sharpe | **+6.67** | +6.05 | +3.21 | +3.53 | +3.32 | +6.12 |
+| DQN-test Sharpe | +4.44 | +2.90 | **+9.01** | +4.19 | +1.21 | +5.91 |
+| Trades (full RL period) | 1,416 | 1,182 | 1,372 | 1,122 | — | 1,437 |
+| Profile | **best WF + best val + 6/6 folds** | val-robustness alternative | best test + fold-6 | balanced h=64 | aggregate WF (weak fold-6) | val regularization (h=64) |
 
 **All baselines beat BTC buy-and-hold on val (+7.2%) and test (+8.6%).**
 
-### Headline: VOTE5_H256_DD
+### Headline: VOTE5_v8_H256_DD
 
-`VOTE5_H256_DD` (Phase Z1.1, 2026-05-10) is the **primary deployable system**. It stacks two independently-validated improvements:
+`VOTE5_v8_H256_DD` (Phase Z3 Step 4, 2026-05-11) is the **primary deployable system**. It stacks three independently-validated improvements on top of the original VOTE5 baseline:
+
+- **H256 capacity** (from Z1.1): lifts WF aggregate
+- **Double_Dueling regularization** (from Z1.1): recovers fold-6 robustness
+- **S11_Basis + S13_OBDiv action expansion** (from Z3 Step 4): unique signal types not in original 9 strategies
+
+**Reproduction**:
+```bash
+# Build expanded state cache (signals + valid_actions + state vector)
+python3 -m models.build_state_v8
+
+# Train 5 seeds
+for SEED in 42 7 123 0 99; do
+  python3 -m models.dqn_selector btc \
+    --tag VOTE5_v8_H256_DD_seed${SEED} \
+    --state-version v8_s11s13 \
+    --hidden 256 --algo double_dueling \
+    --fee 0.0 --trade-penalty 0.001 --seed ${SEED}
+done
+
+# Evaluate
+python3 -m models.eval_z2_z3
+```
+
+Wall time: ~10 min total (1.5 min state build + 5 × ~2 min training).
+
+---
+
+### Previously promoted: VOTE5_H256_DD
+
+`VOTE5_H256_DD` (Phase Z1.1, 2026-05-10) was the primary baseline before Step 4. It stacked two improvements:
 
 - **H256 capacity**: lifts WF mean Sharpe (+11.86 alone vs +10.40 vanilla)
 - **Double_Dueling regularization**: recovers fold-6 robustness (H256 alone fold-6 +0.41 → stacked **+8.23**)

@@ -121,5 +121,27 @@ EXECUTION_CONFIG = {
         sizing = VolScaledSizer(target_risk_pct=0.007),
     ),
 
-    # Killed (Sharpe < -20 on both splits): S5_OFIScalp, S9_LargeOrd, S11_Basis, S13_OBDiv
+    # ── S11: Basis momentum — slow mean-reversion-leaning, 180-bar TS ─────────
+    "S11_Basis": ExecutionConfig(
+        entry  = MarketEntry(),
+        exit   = ComboExit(
+            base_tp_pct=0.015, base_sl_pct=0.006,
+            breakeven_pct=0.004, time_stop_bars=180,
+            trail_after_breakeven=False,   # mean-reversion: no trail
+        ),
+        sizing = VolScaledSizer(target_risk_pct=0.007),
+    ),
+
+    # ── S13: OB Disagreement — microstructure, 30-bar TS ─────────────────────
+    "S13_OBDiv": ExecutionConfig(
+        entry  = MarketEntry(),
+        exit   = ComboExit(
+            base_tp_pct=0.012, base_sl_pct=0.006,
+            breakeven_pct=0.003, time_stop_bars=30,
+            trail_after_breakeven=False,
+        ),
+        sizing = VolScaledSizer(target_risk_pct=0.007),
+    ),
+
+    # Killed (overlap with S8 / spot_imbalance, worse standalone): S5_OFIScalp, S9_LargeOrd
 }
