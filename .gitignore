@@ -13,5 +13,6 @@ saved_models/
 venv/
 .venv/
 *.egg-info/
-collection/okx_ob_download_v3/env.yaml
+collection/*/env.yaml
+collection/*/env.yml
 .claude/scheduled_tasks.lock
