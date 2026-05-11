@@ -85,19 +85,137 @@ The right order is **Z3 standalone validation → Z2 cheap warm-up → Z2 strong
 **Decision**: keep strategies with win-rate >50% AND mean PnL >0.15% (median across current 9). Drop the rest.
 **Proof of value**: 4 strategies exist as production-ready code that has never been evaluated as part of the DQN action space. The maximum information-per-hour ratio in this entire plan. Even if all 4 fail (a real possibility), the negative result reshapes the plan by removing Steps 4 and 6.
 
-#### Step 2 — Z2.4 price-action context
-**What**: Add 4 features to state vector: `price_max_60/now`, `now/price_min_60`, `realized_vol_60`, `vol_ratio_30_60`. Regenerate state cache as `v7_pa`. Retrain 5 H256+DD seeds. Eval as K=5 plurality.
-**Decision**: keep if WF ≥ +11.55 (current +0.5) AND no fold worse by >0.5.
-**Proof of value**: state currently has regime-id but no continuous "how-extreme-is-this-bar" features. Recent-extreme distance and realized vol are the simplest possible additions; if they don't help, more sophisticated features (basis, cross-asset) probably won't either. **This is also a pipeline test** — establishes that v7 state retrain works before we invest 4 hours into Z2.2.
+#### Step 2 — Z2.4 price-action context (the cheap pipeline-test)
 
-#### Step 3 — Z2.2 perp basis + funding state
-**What**: Add 5 features: `basis_z_60`, `basis_change_1bar`, `funding_rate_apr`, `funding_z_120`, `oi_change_60`. State `v7_basis`. Retrain, eval.
-**Decision**: keep if WF ≥ +11.55 AND val ≥ +3.0 (basis features should specifically help OOD val resilience).
-**Proof of value**:
-- **None of these features are in current state** despite being in [meta parquet](../cache/okx_btcusdt_spotpepr_20260425_meta.parquet).
-- Basis and funding are leading indicators for leverage-driven moves (squeezes, liquidations). Their *absence* from state is a known gap.
-- The fee-aware retrain experiment ([fee_aware_retrain.md](fee_aware_retrain.md)) showed adding fee to reward but NOT state was suboptimal — a clue that important context belongs in state, not just in reward.
-- This is **the most theoretically-grounded Z2 candidate.**
+**The problem this addresses**:
+The current 50-dim state vector has the *regime classifier output* (one-hot over {calm, trend_up, trend_down, ranging, chop}) and the ATR prediction. What it does NOT have is **a continuous measure of how extreme the current bar's position is relative to recent history**. The DQN sees "we're in a trend_up regime" but not "we're currently 5% below the 60-bar high" or "we just got 2× vol expansion in the last 30 bars."
+
+A trader frames this naturally: "BTC is pulling back 5% from recent peak; vol is expanding; I'm cautious." The DQN has the regime label but lacks the *position-within-regime* signal.
+
+**The 4 features** (all derived from the 50-bar price array — no new data dependencies):
+
+| feature | formula | range (typical) | what it measures |
+|---|---|---|---|
+| `price_drawdown_60` | `1 - price_now / max(price[-60:])` | 0 to ~0.05 | how far below recent 60-bar high (0 = at high) |
+| `price_runup_60` | `price_now / min(price[-60:]) - 1` | 0 to ~0.05 | how far above recent 60-bar low (0 = at low) |
+| `realized_vol_60` | `std(returns_60)` × √60 | ~0.001 to ~0.01 | actual realized volatility over last 60 bars |
+| `vol_ratio_30_60` | `atr_30 / median(atr_60)` | ~0.5 to ~3.0 | short-term vs medium-term vol ratio (regime transition signal) |
+
+**Concrete example**:
+```
+BTC at $100,000.
+  max in last 60 bars = $102,000  → price_drawdown_60 = 1.96% (pullback context)
+  min in last 60 bars = $99,500   → price_runup_60    = 0.50%
+  std of 60 returns   = 0.00080   → realized_vol_60   = 0.0062
+  ATR_30 / median(ATR_60) = 1.85  → vol_ratio_30_60   = 1.85 (vol expanding)
+```
+
+State vector grows: 50 → 54 dims.
+
+**Why these specific features**:
+- **Cheapest possible state addition** — pure derivations from price array, no new data parsing
+- **Continuous, normalized** — fits the existing state convention (all current dims are roughly normalized)
+- **Orthogonal to regime classifier** — regime is discrete; these are continuous measurements within a regime
+- **Used in classical trader frameworks** — pullback distance, vol expansion ratio are textbook context features
+
+**Why this might fail**:
+- Regime classifier might already encode similar info in discrete form
+- ATR is already in state — `vol_ratio_30_60` might add little beyond raw ATR
+- DQN might not need these because the signal-strategy interaction (e.g. S1_VolDir requiring `vol_thresh > 0.60`) already encodes vol context
+
+**Implementation pipeline** (~25 min training, ~1 hour total):
+1. Modify [models/dqn_state.py](../models/dqn_state.py) to compute these 4 features over the cached price array and append to state vector.
+2. Add `--state-version v7_pa` to [models/dqn_selector.py](../models/dqn_selector.py); regenerate state cache: `cache/btc_dqn_state_{train,val,test}_v7_pa.npz`.
+3. Train 5 H256+DD seeds: `python3 -m models.dqn_selector btc --tag VOTE5_v7pa_H256_DD_seed{S} --state-version v7_pa --hidden 256 --algo double_dueling --fee 0.0 --trade-penalty 0.001 --seed {S}`.
+4. Evaluate as K=5 plurality vs `VOTE5_H256_DD` baseline.
+
+**Decision criterion**: keep if WF ≥ +11.55 (current +0.5) AND no fold worse by >0.5.
+
+**Proof of value beyond the test itself**: this is the **pipeline-test** for v7 state. It validates that:
+- The state cache regeneration works correctly
+- H256+DD training accepts arbitrary `state_dim` not hardcoded to 50
+- Plurality voting works on networks with non-50 input dim
+
+If this step succeeds mechanically (regardless of Sharpe outcome), Step 3 (Z2.2) can proceed with confidence. If it fails mechanically, we discover infrastructure debt cheaply.
+
+**Risk**: low. Cost: ~1 hour. Expected lift: 0 to +1 Sharpe.
+
+---
+
+#### Step 3 — Z2.2 perp basis + funding state (the strong macro-context add)
+
+**The problem this addresses**:
+BTC perpetual futures trade on leverage. Two macro indicators dominate the leveraged-flow narrative — **basis** (perp-spot price spread) and **funding rate** (the 8h tax/subsidy that anchors perp to spot). Both:
+1. Exist in our raw data (`spot_*_price`, `perp_*_price`, `fund_rate` in meta parquet)
+2. Are NOT in the current state vector
+3. Are used by traders to predict squeeze conditions, liquidation cascades, and trend exhaustion
+
+The current DQN sees `signals[k]` for `S2_Funding` (a binary fire/no-fire based on funding magnitude). It does NOT see the *raw* funding rate value, *direction* of funding change, basis dislocation Z-score, or open-interest dynamics. This is the analog of "you can see the strategy fired" without "you can see the underlying conditions that caused the fire."
+
+**The fee-aware retrain experiment ([fee_aware_retrain.md](fee_aware_retrain.md)) is direct evidence this matters**: adding fee to the reward (so the policy was *penalized* for it) but NOT to the state (so the policy couldn't *see* it) produced a policy that under-performed both vanilla VOTE5 + filter AND maker-only. The fix was clear: the policy needs to *see* the cost context, not just be punished for it. Same principle applies to funding/basis.
+
+**The 5 features**:
+
+| feature | formula | range | what it measures |
+|---|---|---|---|
+| `basis_z_60` | `(basis - mean(basis_60)) / std(basis_60)` | typically −3 to +3 | perp-spot dislocation in std-deviations from recent normal |
+| `basis_change_1bar` | `basis[t] - basis[t-1]` (in bps) | ±5 bps usually | basis acceleration / deceleration (trend in dislocation) |
+| `funding_rate_apr` | `fund_rate × (365 × 24/8)` | typically −60% to +25% APR | current annualized funding cost |
+| `funding_z_120` | `(funding - mean(funding_120)) / std(funding_120)` | typically −3 to +3 | funding extreme relative to recent regime |
+| `oi_change_60` | `(oi[t] - oi[t-60]) / oi[t-60]` | typically ±0.05 | open-interest growth rate (leverage building or unwinding) |
+
+**Concrete example** (extreme leverage build-up scenario):
+```
+basis = +6 bps (perp expensive vs spot)
+  mean basis over 60 bars = -4 bps
+  std basis over 60 bars  = 2 bps
+  → basis_z_60 = (6 - (-4)) / 2 = +5.0    (extreme dislocation, well above 2σ)
+
+basis_change_1bar = +1.2 bps     (still expanding, accelerating)
+
+fund_rate = +0.0001 / bar
+  → funding_rate_apr = +0.01% × (365 × 24 / 8) × 100 = +10.95% APR
+  funding_z over 120 bars = +2.1   (high vs recent regime)
+
+oi_change_60 = +3.2%             (3.2% increase in open interest in last 60 bars)
+
+Interpretation for the DQN: "basis dislocated extremely above recent norm,
+still expanding, funding above 95th percentile, OI growing rapidly."
+This is a textbook over-leveraged-long setup that often precedes long-squeezes.
+```
+
+State vector grows: 50 → 55 dims.
+
+**Why these specific features**:
+- **Each one is documented as a leading indicator** in published research on perpetual markets
+- **All raw inputs already in meta parquet** — only feature engineering needed
+- **Time-scales are diverse**: 1-bar (instant), 60-bar (1h), 120-bar (2h) — capturing different decay rates
+- **Funding has a 8h periodicity** — z-score over 120 bars (= 15 funding cycles) is the right normalization
+
+**Why I called this the strongest Z2 candidate**:
+1. **Three macro signals (basis, funding, OI)** are completely absent from current state
+2. **Documented edge** — published research shows these are leading indicators
+3. **The fee experiment provided direct evidence** that important reward-side context belongs in state too
+4. **Strategies that USE these signals already exist** (S2_Funding deployed, S11_Basis available) — the state additions complement them
+
+**Why this might fail**:
+- Funding only changes every 8h — most consecutive bars share the same value, so the funding features are mostly piecewise-constant. DQN might not extract signal from sparse-updating features.
+- Basis has been consistently negative in this dataset (median −4.55 bps) — the policy might overfit on the asymmetry.
+- OI change is normalized, but absolute OI levels (which matter for "is this big enough to move price") are not in state.
+
+**Implementation pipeline** (~3-4 hours total):
+1. Extend `models/dqn_state.py` to compute these 5 features from meta parquet columns (`fund_rate`, `oi_usd`, `spot_*_price`, `perp_*_price`).
+2. Use `--state-version v7_basis` tag; regenerate state cache (`cache/btc_dqn_state_{train,val,test}_v7_basis.npz`).
+3. Train 5 H256+DD seeds with `--state-version v7_basis`. Training time ~5 min/seed × 5 = ~25 min. Plus feature regen ~10 min.
+4. Evaluate as K=5 plurality.
+
+**Decision criterion**: keep if WF ≥ +11.55 (current +0.5) AND **val ≥ +3.0** (basis features should specifically help OOD val resilience — that's the main hypothesis).
+
+**Expected lift**: +0.5 to +2.0 WF. Val should improve more than test because val period had volatile basis/funding swings (Jan-Feb 2026).
+
+**Why this is run after Step 2**: Step 2 establishes that v7 state retrain works. Step 3 is more expensive (more features = more careful feature engineering) and we want the cheap pipeline-test to succeed first.
+
+**Risk**: medium. Cost: ~3-4 hours. Expected lift: 0 to +2 Sharpe (highest expected value of any Z2 candidate).
 
 #### Step 4 — Z3.1 wire & retrain (REVISED post Step 1)
 **What**: Step 1 showed S11_Basis + S13_OBDiv carry unique signal types (basis momentum, cross-instrument OB disagreement) not covered by current 9. S5 + S9 dropped (redundant with S8). Add S11 + S13 only → 10 → 12 actions. Train 5 H256+DD seeds → `VOTE5_v8_H256_DD`.
