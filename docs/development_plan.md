@@ -76,7 +76,7 @@ The right order is **Z3 standalone validation → Z2 cheap warm-up → Z2 strong
 | **2** ❌ | [Z2.4 price-action context](#step-2) | DONE 2026-05-11 | — | **NEGATIVE.** WF +9.18 vs baseline +11.05. Drop v7_pa. See [z2_z3_results.md](z2_z3_results.md). |
 | **3** 🟡 | [Z2.2 perp basis + funding state](#step-3) | DONE 2026-05-11 | — | **PARTIAL.** Val resilience confirmed (+3.46), but test/fold-6 regressed. Keep as alternative. |
 | **4** ✅ | [Z3.1 wire & retrain](#step-4) | DONE 2026-05-11 | — | **WIN. `VOTE5_v8_H256_DD` PROMOTED as new primary baseline. WF +12.07, val +6.67, 6/6 folds.** |
-| **5** | [Z2.5 combined state v7](#step-5) | ~30 min | Steps 3+4 winners | NEXT — combine v8 action space + v7_basis state |
+| **5** 🟡 | [Z2.5 combined state v7](#step-5) | DONE 2026-05-11 | — | **NOT ADDITIVE.** WF +10.47 vs Step 4 +12.07. Feature overlap (basis in both state + S11 action). Retained as fold-6 alternative. |
 | **6** | [Z3.2 S15_VolBreakout](#step-6) | ~0.5 day | Step 4 pipeline works ✓ | gated after Step 5 |
 
 #### Step 1 — Z3.1 standalone validation

@@ -70,14 +70,46 @@ Step 2 (price-action context) was a **negative result** — drop. Step 3 (basis+
 | 4 | `BASELINE_VOTE5_H256` | +11.86 | +3.32 | +1.21 | 6/6 | +0.41 |
 | 5 | `BASELINE_VOTE5` (vanilla) | +10.40 | +3.53 | +4.19 | 6/6 | +5.20 |
 
-## Next step proposal
+## Step 5 — combined v9 (v7_basis state + v8 action space) — NOT ADDITIVE
 
-Per the plan, Step 5 (Z2.5 combined state v7) would test additivity. Now that Step 3 + Step 4 both produced winners (Step 3 marginal, Step 4 clear):
+**Hypothesis**: combine Step 3's basis/funding state with Step 4's expanded action space to capture both lifts (val resilience from state + WF from actions).
 
-**Step 5 candidates worth running**:
-1. **v8 action space + v7_basis state combined** — should give both: action-space lift (+1.02 WF) AND val resilience (+2.84 val). Cost: ~30 min. **Highest expected payoff.**
-2. ~~v7_pa + v7_basis combined~~ — skip, v7_pa was negative.
+**Result**: combination does **not** compose. Lost both lifts.
 
-Other forward paths:
+| config | WF | val | test | fold-6 |
+|---|---:|---:|---:|---:|
+| Step 4 (v8) — primary | **+12.07** | **+6.67** | +4.44 | +4.44 |
+| Step 5 (v9 combined) | +10.47 | +4.40 | **+7.04** | **+6.95** |
+| Δ vs Step 4 | **−1.60** | −2.27 | +2.60 | +2.51 |
+
+Decision gate was WF ≥ max(Step 3, Step 4) + 0.3 = +12.37. Step 5 achieved +10.47 → **FAIL**.
+
+### Why it doesn't compose
+
+Feature overlap. The basis state features (basis_z_60, funding_apr, etc.) provide macro context the DQN can condition on. `S11_Basis` strategy *uses* basis z-score as its signal generator. With both:
+- Basis info in state (Step 3 features)
+- Basis info as an action (Step 4's S11)
+
+...the policy has redundant pathways for the same signal type and over-relies on it, losing the orthogonality that made each addition work alone.
+
+### But — Step 5 has the best test + fold-6 among v8-family
+
+`VOTE5_v9_H256_DD` retained as a **late-period robustness** alternative:
+- Best test of any v8-family ensemble (+7.04)
+- Best fold-6 of any v8-family ensemble (+6.95)
+- WF +10.47 still beats vanilla VOTE5 (+10.40)
+
+### Final disposition
+
+| baseline | role |
+|---|---|
+| **`VOTE5_v8_H256_DD`** | primary (best WF, val, 6/6 folds) |
+| `VOTE5_v7basis_H256_DD` | val-resilience alternative |
+| `VOTE5_v9_H256_DD` | fold-6 / test alternative |
+| `VOTE5_H256_DD` (Z1) | classic alternative, balanced |
+
+## Next forward paths
+
 - **Test fee=4.5bp** on the new `VOTE5_v8_H256_DD` baseline (per Z5.3)
-- **Phase Z4** (architecture experiments) — now there's a higher baseline to beat
+- **Step 6** (Z3.2 S15_VolBreakout) — add the truly-new vol-expansion strategy
+- **Phase Z4** (architecture experiments) — higher baseline now to beat

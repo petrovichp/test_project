@@ -1,5 +1,8 @@
 # Crypto Trading ML — Results & Conclusions
 
+> **Status (2026-05-11, post Z2/Z3 Step 5):**
+> - **Step 5 NEGATIVE-on-aggregate** ([docs/z2_z3_results.md](docs/z2_z3_results.md)). Combining v7_basis state (Step 3) + v8 action space (Step 4) does NOT compose. WF dropped from +12.07 to +10.47 (Δ −1.60), val from +6.67 to +4.40 (Δ −2.27). Hypothesis: feature overlap — basis info in both state (Step 3 features) and action (S11 strategy uses basis) creates redundancy that hurts the policy. **`VOTE5_v8_H256_DD` remains primary baseline.** `VOTE5_v9_H256_DD` retained as fold-6 / test-robust alternative (test +7.04 best in v8-family, fold-6 +6.95).
+>
 > **Status (2026-05-11, post Z2+Z3 Steps 2/3/4 — new baseline VOTE5_v8_H256_DD):**
 > - **Step 4 WIN — `VOTE5_v8_H256_DD` PROMOTED as new primary baseline** ([docs/z2_z3_results.md](docs/z2_z3_results.md)). Added S11_Basis + S13_OBDiv to action space (10 → 12 actions). WF mean Sharpe **+12.07** (vs prior +11.05, Δ +1.02), val **+6.67** (Δ +3.46), 6/6 folds positive. Test dropped (+9.01 → +4.44, Δ −4.57) — real cost — but WF aggregate is up and val resilience is materially better. The "killed" verdict on S11/S13 from earlier work was based on standalone Sharpe only; in the DQN action space they prove their value by covering signal types not in the original 9.
 > - **Step 2 NEGATIVE** — price-action context features (drawdown_60, runup_60, realized_vol_60, vol_ratio_30_60) hurt the policy: WF dropped −1.87 to +9.18, val collapsed to −1.49, fold 5 turned negative. Features were redundant with regime + ATR + windowed price already in state. Drop v7_pa.
