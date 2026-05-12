@@ -46,7 +46,8 @@ def stratified_batch_indices(actions_tr: np.ndarray, batch: int, rng) -> np.ndar
     return out
 
 
-def train_student(seed: int, tag: str, soft_weight: float = SOFT_WEIGHT):
+def train_student(seed: int, tag: str, soft_weight: float = SOFT_WEIGHT,
+                  targets_suffix: str = "v8"):
     torch.manual_seed(seed); np.random.seed(seed)
     rng = np.random.default_rng(seed + 1000)
     t0 = time.perf_counter()
@@ -56,8 +57,8 @@ def train_student(seed: int, tag: str, soft_weight: float = SOFT_WEIGHT):
 
     sp_tr = np.load(CACHE / "state" / f"btc_dqn_state_train{STATE_SUFFIX}.npz")
     sp_v  = np.load(CACHE / "state" / f"btc_dqn_state_val{STATE_SUFFIX}.npz")
-    tgt_tr = np.load(CACHE / "distill" / "btc_distill_targets_train_v8.npz")
-    tgt_v  = np.load(CACHE / "distill" / "btc_distill_targets_val_v8.npz")
+    tgt_tr = np.load(CACHE / "distill" / f"btc_distill_targets_train_{targets_suffix}.npz")
+    tgt_v  = np.load(CACHE / "distill" / f"btc_distill_targets_val_{targets_suffix}.npz")
 
     s_tr = torch.from_numpy(sp_tr["state"]).float()
     v_tr = torch.from_numpy(sp_tr["valid_actions"]).bool()
@@ -182,5 +183,7 @@ if __name__ == "__main__":
     ap.add_argument("--tag",  default="DISTILL_v8")
     ap.add_argument("--soft-weight", type=float, default=0.0, dest="soft_weight",
                     help="weight on MSE-to-teacher-Q (0 = pure CE distillation)")
+    ap.add_argument("--targets-suffix", default="v8", dest="targets_suffix",
+                    help="suffix for btc_distill_targets_{split}_{suffix}.npz")
     args = ap.parse_args()
-    train_student(args.seed, args.tag, args.soft_weight)
+    train_student(args.seed, args.tag, args.soft_weight, args.targets_suffix)

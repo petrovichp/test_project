@@ -155,7 +155,7 @@ def load_qr_net(seed):
 
 
 def load_xfmr_net(seed):
-    n = TransformerDQN(52, 12, d_model=16, n_heads=4, n_layers=2, hidden=128)
+    n = TransformerDQN(52, 12, d_model=8, n_heads=2, n_layers=1, hidden=128)
     n.load_state_dict(torch.load(POLICIES / f"btc_dqn_policy_XFMR_v8_seed{seed}.pt",
                                    map_location="cpu"))
     n.eval(); return n

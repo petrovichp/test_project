@@ -3354,8 +3354,81 @@
     "members": ["QRDQN_v8_seed42", "QRDQN_v8_seed7", "QRDQN_v8_seed123",
                 "QRDQN_v8_seed0", "QRDQN_v8_seed99"],
     "alpha_cvar": 0.3,
-    "val_sharpe": 4.768, "test_sharpe": 5.081,
+    "wf_mean_sharpe": 11.583, "val_sharpe": 4.881, "test_sharpe": 5.123,
+    "wf_folds_positive": 6,
     "trained_at": "2026-05-12",
-    "notes": "Z4.4 NEGATIVE-LEAN. Plurality vote with CVaR-0.3 action selection. Val +4.77 / test +5.08 — does NOT beat VOTE5_v8 (val +6.67, test +4.44) or DISTILL_v8_seed42 (val +10.41, test +9.35). Best single seed (s=0) hits test +7.95 but worse val. CVaR-0.3 is the best alpha (vs 0.1, 0.5, 1.0)."
+    "notes": "Z4.4 NEGATIVE-LEAN. Plurality vote with CVaR-0.3 action selection. WF +11.58, val +4.88, test +5.12 — does NOT beat VOTE5_v8 (WF +12.07) or DISTILL_v8_seed42 (val +10.41, test +9.35). Best single seed (s=0) hits test +7.95 but worse val."
+  },
+  "XFMR_v8_seed42": {
+    "ticker": "btc", "model_type": "transformer_dqn", "tag": "XFMR_v8_seed42", "seed": 42,
+    "algo": "transformer_dueling", "d_model": 8, "n_heads": 2, "n_layers": 1, "hidden": 128,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "XFMR_v8_VOTE5_seed42",
+    "wf_mean_sharpe": 6.253, "val_sharpe_training_best": 6.690, "test_sharpe": 4.116,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_XFMR_v8_seed42.pt",
+    "trained_at": "2026-05-12", "notes": "Z4.2 Transformer-DQN."
+  },
+  "XFMR_v8_seed7": {
+    "ticker": "btc", "model_type": "transformer_dqn", "tag": "XFMR_v8_seed7", "seed": 7,
+    "algo": "transformer_dueling", "d_model": 8, "n_heads": 2, "n_layers": 1, "hidden": 128,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "XFMR_v8_VOTE5_seed7",
+    "wf_mean_sharpe": 6.678, "val_sharpe_training_best": 7.623, "test_sharpe": 4.252,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_XFMR_v8_seed7.pt",
+    "trained_at": "2026-05-12", "notes": "Z4.2 Transformer-DQN."
+  },
+  "XFMR_v8_seed123": {
+    "ticker": "btc", "model_type": "transformer_dqn", "tag": "XFMR_v8_seed123", "seed": 123,
+    "algo": "transformer_dueling", "d_model": 8, "n_heads": 2, "n_layers": 1, "hidden": 128,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "XFMR_v8_VOTE5_seed123",
+    "wf_mean_sharpe": 5.317, "val_sharpe_training_best": 4.919, "test_sharpe": 2.155,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_XFMR_v8_seed123.pt",
+    "trained_at": "2026-05-12", "notes": "Z4.2 Transformer-DQN."
+  },
+  "XFMR_v8_seed0": {
+    "ticker": "btc", "model_type": "transformer_dqn", "tag": "XFMR_v8_seed0", "seed": 0,
+    "algo": "transformer_dueling", "d_model": 8, "n_heads": 2, "n_layers": 1, "hidden": 128,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "XFMR_v8_VOTE5_seed0",
+    "wf_mean_sharpe": 7.712, "val_sharpe_training_best": 11.105, "test_sharpe": 6.627,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_XFMR_v8_seed0.pt",
+    "trained_at": "2026-05-12",
+    "notes": "Z4.2 Transformer-DQN. Project-record single-seed greedy val Sharpe (+11.11). Outlier — plurality voting dilutes it."
+  },
+  "XFMR_v8_seed99": {
+    "ticker": "btc", "model_type": "transformer_dqn", "tag": "XFMR_v8_seed99", "seed": 99,
+    "algo": "transformer_dueling", "d_model": 8, "n_heads": 2, "n_layers": 1, "hidden": 128,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "XFMR_v8_VOTE5_seed99",
+    "wf_mean_sharpe": 4.952, "val_sharpe_training_best": 4.579, "test_sharpe": 3.770,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_XFMR_v8_seed99.pt",
+    "trained_at": "2026-05-12", "notes": "Z4.2 Transformer-DQN."
+  },
+  "XFMR_v8_VOTE5": {
+    "ticker": "btc", "model_type": "ensemble", "tag": "XFMR_v8_VOTE5",
+    "ensemble_mode": "plurality",
+    "members": ["XFMR_v8_seed42", "XFMR_v8_seed7", "XFMR_v8_seed123",
+                "XFMR_v8_seed0", "XFMR_v8_seed99"],
+    "wf_mean_sharpe": 6.345, "val_sharpe": 4.879, "test_sharpe": 5.954,
+    "wf_folds_positive": 6,
+    "trained_at": "2026-05-12",
+    "notes": "Z4.2 NEGATIVE. Plurality vote. WF +6.35, val +4.88, test +5.95 — underperforms VOTE5_v8_H256_DD (WF +12.07) by ~5.7 Sharpe and DISTILL_v8_seed42 (test +9.35). Multi-head attention's pairwise-interaction prior doesn't match this curated-feature state vector."
+  },
+  "DISTILL_XFMR_v8_seed42": {
+    "ticker": "btc", "model_type": "dqn", "tag": "DISTILL_XFMR_v8_seed42", "seed": 42,
+    "algo": "dueling_distill", "hidden": 256,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.0,
+    "teacher": "XFMR_v8_VOTE5", "targets_suffix": "xfmr",
+    "wf_mean_sharpe": 6.372, "val_sharpe": 9.414, "test_sharpe": 2.831,
+    "wf_folds_positive": 5,
+    "model_file": "btc_dqn_policy_DISTILL_XFMR_v8_seed42.pt",
+    "trained_at": "2026-05-12",
+    "notes": "Z4.2 follow-on. NEGATIVE — distilled XFMR ensemble. Val +9.41 / test +2.83 — wide spread vs canonical DISTILL_v8_seed42 (val +10.41 / test +9.35). One fold flips negative (5/6). Student inherits weak teacher signal."
   }
 }

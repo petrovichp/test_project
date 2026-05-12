@@ -103,9 +103,26 @@ def stress_inversion(sp):
 
 
 def stress_regime_shuffle(sp, rng):
-    """Random permutation of regime_id labels."""
-    new_sp = {k: v.copy() for k, v in sp.items()}
-    new_sp["regime_id"] = rng.permutation(sp["regime_id"])
+    """Row-shuffle regime one-hot inside the state tensor (state[:, 2:7]).
+
+    NOTE: the previous version of this function shuffled a standalone
+    `regime_id` integer sidecar that `run_eval` never reads — so the
+    perturbation was invisible to the policy. The corrected version
+    here shuffles state[:, 2:7], which is the actual model input.
+    See models/audit_regime_direction.py for diagnostic context.
+    """
+    new_sp = {k: (v.copy() if hasattr(v, "copy") else v) for k, v in sp.items()}
+    perm = rng.permutation(sp["state"].shape[0])
+    new_sp["state"] = sp["state"].copy()
+    new_sp["state"][:, 2:7] = sp["state"][perm, 2:7]
+    return new_sp
+
+
+def stress_regime_zero(sp):
+    """Zero out the regime one-hot block in state[:, 2:7]."""
+    new_sp = {k: (v.copy() if hasattr(v, "copy") else v) for k, v in sp.items()}
+    new_sp["state"] = sp["state"].copy()
+    new_sp["state"][:, 2:7] = 0.0
     return new_sp
 
 
@@ -138,7 +155,8 @@ def main():
     stresses = [
         ("baseline",          lambda sp: sp),
         ("inverted",          lambda sp: stress_inversion(sp)),
-        ("regime_shuffle",    lambda sp: stress_regime_shuffle(sp, rng)),
+        ("regime_rowshuf",    lambda sp: stress_regime_shuffle(sp, rng)),
+        ("regime_zero",       lambda sp: stress_regime_zero(sp)),
         ("feature_noise_0.1", lambda sp: stress_feature_noise(sp, rng, 0.1)),
     ]
 
