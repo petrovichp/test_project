@@ -1,17 +1,11 @@
 """
-Hyperliquid DEX orderbook downloader v1 — lean enriched schema.
+Hyperliquid DEX orderbook downloader v1.
 
-Analogous to lighter_ob_download but for Hyperliquid perp DEX.
-
-Differences vs Lighter:
-  - Single POST endpoint (no GET) — all requests to /info
-  - metaAndAssetCtxs gives funding + OI + mark/oracle price in one call
-  - OB levels already price-aggregated (no per-order aggregation needed)
-  - Candles include trade count (n)
-  - Quote asset is USDC (native stablecoin on Hyperliquid)
-
-CUMULATIVE DEPTH (16 levels × 2 sides = 32 columns)
-  Column: {bid|ask}_cum_{005|010|...}pct  → cumulative USD amount
+OB stored as raw USD levels at 3 nSigFigs resolutions (20 per side each):
+  nSigFigs=5 (~tick)  → bid/ask_lev01..20_usd        BTC: $1 buckets
+  nSigFigs=4 ($10/$1) → ob4_bid/ask_lev01..20_usd    BTC: $10 buckets
+  nSigFigs=3 ($100)   → ob3_bid/ask_lev01..20_usd    BTC: $100 buckets (macro zones)
+Level prices omitted — step deterministic from nSigFigs + best bid/ask.
 
 Env vars: DBHOST, DBUSER, DBPASSW, DBSQL, TOCKENONE
 """
@@ -19,22 +13,14 @@ Env vars: DBHOST, DBUSER, DBPASSW, DBSQL, TOCKENONE
 import functions_framework
 import os
 import time
-import pandas as pd
 import mysql.connector
 
 from hyperliquid_api import (
-    Hyperliquid, parse_ob, parse_candle, coin_context, deal_imbalance,
+    Hyperliquid, parse_ob, parse_candle, coin_context,
+    parse_predicted_fundings, deal_imbalance,
 )
 
-DEPTH_LEVELS_PCT = [
-    0.05, 0.10, 0.20, 0.30, 0.50, 0.80,
-    1.00, 1.20, 1.50, 2.00, 2.50, 3.00,
-    4.00, 5.00, 6.00, 7.00,
-]
-
-
-def _tag(pct: float) -> str:
-    return f"{pct*100:05.1f}".replace(".", "").lstrip("0").zfill(3)
+N_LEVELS = 20
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
@@ -65,32 +51,16 @@ def db_insert(conn, table: str, row: dict):
     cur.close()
 
 
-# ── OB derived helpers ────────────────────────────────────────────────────────
+# ── OB helpers ────────────────────────────────────────────────────────────────
 
-def cum_depth_at_pct(side: pd.DataFrame, mid: float, pct: float) -> float:
-    if side.index[0] >= mid:
-        mask = side.index <= mid * (1 + pct / 100)
-    else:
-        mask = side.index >= mid * (1 - pct / 100)
-    return float(side.loc[mask, "amount"].sum())
-
-
-def microprice(bids: pd.DataFrame, asks: pd.DataFrame) -> float:
+def microprice(bids, asks) -> float:
     bb, ba = float(bids.index[0]), float(asks.index[0])
     bsz = float(bids["size"].iloc[0])
     asz = float(asks["size"].iloc[0])
     return (bb * asz + ba * bsz) / (bsz + asz) if (bsz + asz) > 0 else (bb + ba) / 2
 
 
-def wall(side: pd.DataFrame, top_n: int = 100) -> tuple[float, float]:
-    top = side.head(top_n)
-    if top.empty:
-        return 0.0, 0.0
-    idx = top["amount"].idxmax()
-    return float(idx), float(top.loc[idx, "size"])
-
-
-def ob_depth_span(bids: pd.DataFrame, asks: pd.DataFrame) -> float:
+def ob_depth_span(bids, asks) -> float:
     return float(min(bids.index[0] - bids.index[-1],
                      asks.index[-1] - asks.index[0]))
 
@@ -119,19 +89,37 @@ def hyperliquid_ob_download(request):
         api = Hyperliquid()
         t_s = int(time.time())
 
-        # ── orderbook ─────────────────────────────────────────────────────
-        bids, asks = parse_ob(api.orderbook(coin))
+        # ── orderbooks at 3 nSigFigs resolutions ─────────────────────────
+        bids,  asks  = parse_ob(api.orderbook(coin, n_sig_figs=5))
+        bids4, asks4 = parse_ob(api.orderbook(coin, n_sig_figs=4))
+        bids3, asks3 = parse_ob(api.orderbook(coin, n_sig_figs=3))
+
         ask_px = float(asks.index[0])
         bid_px = float(bids.index[0])
-        mid    = (ask_px + bid_px) / 2
 
-        # ── meta + asset context (funding, OI, mark, oracle) ──────────────
-        ctx = coin_context(api.meta_and_contexts(), coin)
+        # ── meta + asset context ──────────────────────────────────────────
+        meta_ctxs  = api.meta_and_contexts()
+        ctx        = coin_context(meta_ctxs, coin)
         fund_rate  = float(ctx["funding"])
         mark_px    = float(ctx["markPx"])
         oracle_px  = float(ctx["oraclePx"])
         oi_usd     = float(ctx["openInterest"]) * mark_px
         day_volume = float(ctx["dayNtlVlm"])
+        premium    = float(ctx.get("premium") or 0.0)
+        impact_bid = float((ctx.get("impactPxs") or [0, 0])[0])
+        impact_ask = float((ctx.get("impactPxs") or [0, 0])[1])
+
+        # ── predicted fundings (cross-venue) ──────────────────────────────
+        try:
+            pred = parse_predicted_fundings(api.predicted_fundings(), coin)
+        except Exception:
+            pred = {"hl_predicted": 0.0, "binance_funding": 0.0, "bybit_funding": 0.0}
+
+        # ── OI cap flag ───────────────────────────────────────────────────
+        try:
+            at_oi_cap = int(coin in (api.perps_at_oi_cap() or []))
+        except Exception:
+            at_oi_cap = 0
 
         # ── candle ────────────────────────────────────────────────────────
         candle = parse_candle(api.candles(coin, interval="1m", lookback_ms=600_000))
@@ -140,70 +128,71 @@ def hyperliquid_ob_download(request):
         trades = api.recent_trades(coin)
         d_sell, d_buy = deal_imbalance(trades, lookback_ms=60_000)
 
-        # ── OB metrics ────────────────────────────────────────────────────
-        def _imb(b, a):
-            tb, ta = b["amount"].sum(), a["amount"].sum()
-            return (tb - ta) / (tb + ta + 1e-12)
-
+        # ── OB scalar metrics (from nSigFigs=5 base) ─────────────────────
         spread_bps = (ask_px - bid_px) / bid_px * 10_000
-        imbalance  = _imb(bids, asks)
-        bid_conc   = bids["amount"].head(10).sum() / (bids["amount"].sum() + 1e-12)
-        ask_conc   = asks["amount"].head(10).sum() / (asks["amount"].sum() + 1e-12)
-        lrg        = (bids["amount"].sum() + asks["amount"].sum()) * 0.01
-        lrg_bid    = int((bids["amount"] > lrg).sum())
-        lrg_ask    = int((asks["amount"] > lrg).sum())
         mp         = microprice(bids, asks)
         depth_span = ob_depth_span(bids, asks)
-        wbp, wbs   = wall(bids)
-        wap, was_  = wall(asks)
+        imbalance  = (bids["amount"].sum() - asks["amount"].sum()) / \
+                     (bids["amount"].sum() + asks["amount"].sum() + 1e-12)
+        bid_conc   = bids["amount"].head(10).sum() / (bids["amount"].sum() + 1e-12)
+        ask_conc   = asks["amount"].head(10).sum() / (asks["amount"].sum() + 1e-12)
 
         # ── assemble row ──────────────────────────────────────────────────
         row = {"timestamp": t_s}
 
-        for pct in DEPTH_LEVELS_PCT:
-            tag = _tag(pct)
-            row[f"bid_cum_{tag}pct"] = cum_depth_at_pct(bids, mid, pct)
-            row[f"ask_cum_{tag}pct"] = cum_depth_at_pct(asks, mid, pct)
-
+        # ── prices & market ───────────────────────────────────────────────
         row.update({
             "ask_price":     ask_px,
             "bid_price":     bid_px,
             "mark_price":    mark_px,
             "oracle_price":  oracle_px,
+            "microprice":    mp,
             "spread_bps":    spread_bps,
             "ob_depth_span": depth_span,
             "oi_usd":        oi_usd,
             "fund_rate":     fund_rate,
+            "premium":       premium,
+            "impact_bid_px": impact_bid,
+            "impact_ask_px": impact_ask,
             "day_volume_usd": day_volume,
+            "predicted_funding_hl":      pred["hl_predicted"],
+            "predicted_funding_binance": pred["binance_funding"],
+            "predicted_funding_bybit":   pred["bybit_funding"],
+            "at_oi_cap":     at_oi_cap,
         })
 
+        # ── OHLCV ─────────────────────────────────────────────────────────
         row.update({
-            "open":        candle["open"],
-            "high":        candle["high"],
-            "low":         candle["low"],
-            "close":       candle["close"],
-            "volume":      candle["volume"],
-            "num_trades":  candle["num_trades"],
+            "open":       candle["open"],
+            "high":       candle["high"],
+            "low":        candle["low"],
+            "close":      candle["close"],
+            "volume":     candle["volume"],
+            "num_trades": candle["num_trades"],
         })
 
+        # ── OB scalar metrics ─────────────────────────────────────────────
         row.update({
             "imbalance":         imbalance,
             "bid_concentration": bid_conc,
             "ask_concentration": ask_conc,
-            "large_bid_count":   lrg_bid,
-            "large_ask_count":   lrg_ask,
-            "microprice":        mp,
-            "wall_bid_price":    wbp,
-            "wall_bid_size":     wbs,
-            "wall_ask_price":    wap,
-            "wall_ask_size":     was_,
         })
 
+        # ── taker flow ────────────────────────────────────────────────────
         row.update({
             "sell_usd":       d_sell,
             "buy_usd":        d_buy,
-            "sell_buy_ratio": d_sell / (d_buy + 1e-12),
+            "sell_buy_ratio": (d_sell / d_buy) if d_buy > 0 else 0.0,
         })
+
+        # ── OB levels: 20 per side × 3 resolutions ───────────────────────
+        for prefix, b, a in [("",    bids,  asks),
+                              ("ob4_", bids4, asks4),
+                              ("ob3_", bids3, asks3)]:
+            for i in range(1, N_LEVELS + 1):
+                tag = f"{i:02d}"
+                row[f"{prefix}bid_lev{tag}_usd"] = float(b["amount"].iloc[i-1]) if i <= len(b) else 0.0
+                row[f"{prefix}ask_lev{tag}_usd"] = float(a["amount"].iloc[i-1]) if i <= len(a) else 0.0
 
         # ── persist ───────────────────────────────────────────────────────
         conn = mysql.connector.connect(**db_cfg)

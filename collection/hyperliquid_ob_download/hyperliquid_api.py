@@ -23,12 +23,25 @@ class Hyperliquid:
         return r.json()
 
     def meta_and_contexts(self) -> list:
-        """[meta, asset_contexts] — funding, OI, mark price for all coins in one call."""
+        """[meta, asset_contexts] — funding, OI, mark/oracle price, premium for all coins."""
         return self.post({"type": "metaAndAssetCtxs"})
 
-    def orderbook(self, coin: str) -> dict:
-        """Full-precision L2 snapshot. levels[0]=bids, levels[1]=asks."""
-        return self.post({"type": "l2Book", "coin": coin})
+    def orderbook(self, coin: str, n_sig_figs: int = None,
+                  mantissa: int = None) -> dict:
+        """
+        L2 snapshot. levels[0]=bids (desc), levels[1]=asks (asc).
+
+        n_sig_figs: None=full precision, 2–5 aggregates prices to N sig figs.
+          BTC ~$82k: nSigFigs=5→$1 buckets, 4→$10, 3→$100
+        mantissa: 2 or 5, only valid when n_sig_figs=5.
+          Note: mantissa=1 returns HTTP 500 — avoid.
+        """
+        body = {"type": "l2Book", "coin": coin}
+        if n_sig_figs is not None:
+            body["nSigFigs"] = n_sig_figs
+        if mantissa is not None and n_sig_figs == 5:
+            body["mantissa"] = mantissa
+        return self.post(body)
 
     def candles(self, coin: str, interval: str = "1m",
                 lookback_ms: int = 600_000) -> list:
@@ -44,6 +57,14 @@ class Hyperliquid:
     def recent_trades(self, coin: str) -> list:
         """Recent trades. side: 'B'=buy-initiated, 'A'=sell-initiated."""
         return self.post({"type": "recentTrades", "coin": coin})
+
+    def predicted_fundings(self) -> list:
+        """Predicted next-period funding for all coins + cross-venue rates (Binance, Bybit)."""
+        return self.post({"type": "predictedFundings"})
+
+    def perps_at_oi_cap(self) -> list:
+        """List of coin names currently at their open-interest cap."""
+        return self.post({"type": "perpsAtOpenInterestCap"})
 
 
 # ── OB parsing ────────────────────────────────────────────────────────────────
@@ -89,6 +110,30 @@ def coin_context(meta_ctxs: list, coin: str) -> dict:
         if asset["name"] == coin:
             return ctxs[i]
     raise KeyError(f"Coin {coin} not found in universe")
+
+
+def parse_predicted_fundings(raw: list, coin: str) -> dict:
+    """
+    Extract HL predicted + cross-venue rates for a given coin.
+    Returns: {hl_predicted, binance_funding, bybit_funding} — hourly rates.
+    Response shape: [[coin, [[venue, {fundingRate, ...}], ...]], ...]
+    """
+    result = {"hl_predicted": 0.0, "binance_funding": 0.0, "bybit_funding": 0.0}
+    venue_map = {"HlPerp": "hl_predicted", "BinPerp": "binance_funding",
+                 "BybitPerp": "bybit_funding"}
+    for entry in raw:
+        c      = entry[0] if isinstance(entry, list) else entry.get("coin", "")
+        venues = entry[1] if isinstance(entry, list) else entry.get("exchanges", [])
+        if c != coin:
+            continue
+        for ve in venues:
+            vname = ve[0] if isinstance(ve, list) else ve.get("exchange", "")
+            vdata = ve[1] if isinstance(ve, list) else ve
+            key   = venue_map.get(vname)
+            if key:
+                result[key] = float(vdata.get("fundingRate", 0.0) or 0.0)
+        break
+    return result
 
 
 def deal_imbalance(trades: list, lookback_ms: int = 60_000) -> tuple[float, float]:
