@@ -3305,5 +3305,57 @@
     "wf_folds_positive": 6, "n_trades_test": 301, "n_trades_val": 457,
     "trained_at": "2026-05-11",
     "notes": "Z2.1 — SOL cross-asset. WF +8.24, val +4.16, test +2.19, 6/6 folds positive. Best cross-asset transfer of the two non-BTC tickers."
+  },
+  "QRDQN_v8_seed42": {
+    "ticker": "btc", "model_type": "qr_dqn", "tag": "QRDQN_v8_seed42", "seed": 42,
+    "algo": "qrdqn_dueling", "hidden": 256, "n_quantiles": 32, "alpha_cvar": 0.3,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "QRDQN_v8_VOTE5_seed42",
+    "val_sharpe_single_greedy": 6.386,
+    "model_file": "btc_dqn_policy_QRDQN_v8_seed42.pt",
+    "trained_at": "2026-05-12",
+    "notes": "Z4.4 — quantile-regression DQN with CVaR-0.3 action selection. Single-seed val +6.39."
+  },
+  "QRDQN_v8_seed7": {
+    "ticker": "btc", "model_type": "qr_dqn", "tag": "QRDQN_v8_seed7", "seed": 7,
+    "algo": "qrdqn_dueling", "hidden": 256, "n_quantiles": 32, "alpha_cvar": 0.3,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "QRDQN_v8_VOTE5_seed7", "val_sharpe_single_greedy": 6.421,
+    "model_file": "btc_dqn_policy_QRDQN_v8_seed7.pt",
+    "trained_at": "2026-05-12", "notes": "Z4.4 QR-DQN"
+  },
+  "QRDQN_v8_seed123": {
+    "ticker": "btc", "model_type": "qr_dqn", "tag": "QRDQN_v8_seed123", "seed": 123,
+    "algo": "qrdqn_dueling", "hidden": 256, "n_quantiles": 32, "alpha_cvar": 0.3,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "QRDQN_v8_VOTE5_seed123", "val_sharpe_single_greedy": 5.108,
+    "model_file": "btc_dqn_policy_QRDQN_v8_seed123.pt",
+    "trained_at": "2026-05-12", "notes": "Z4.4 QR-DQN"
+  },
+  "QRDQN_v8_seed0": {
+    "ticker": "btc", "model_type": "qr_dqn", "tag": "QRDQN_v8_seed0", "seed": 0,
+    "algo": "qrdqn_dueling", "hidden": 256, "n_quantiles": 32, "alpha_cvar": 0.3,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "QRDQN_v8_VOTE5_seed0", "val_sharpe_single_greedy": 4.858,
+    "model_file": "btc_dqn_policy_QRDQN_v8_seed0.pt",
+    "trained_at": "2026-05-12", "notes": "Z4.4 QR-DQN. Best test +7.95 at CVaR=0.3."
+  },
+  "QRDQN_v8_seed99": {
+    "ticker": "btc", "model_type": "qr_dqn", "tag": "QRDQN_v8_seed99", "seed": 99,
+    "algo": "qrdqn_dueling", "hidden": 256, "n_quantiles": 32, "alpha_cvar": 0.3,
+    "state_version": "v8_s11s13", "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "QRDQN_v8_VOTE5_seed99", "val_sharpe_single_greedy": 6.203,
+    "model_file": "btc_dqn_policy_QRDQN_v8_seed99.pt",
+    "trained_at": "2026-05-12", "notes": "Z4.4 QR-DQN"
+  },
+  "QRDQN_v8_VOTE5": {
+    "ticker": "btc", "model_type": "ensemble", "tag": "QRDQN_v8_VOTE5",
+    "ensemble_mode": "plurality_cvar",
+    "members": ["QRDQN_v8_seed42", "QRDQN_v8_seed7", "QRDQN_v8_seed123",
+                "QRDQN_v8_seed0", "QRDQN_v8_seed99"],
+    "alpha_cvar": 0.3,
+    "val_sharpe": 4.768, "test_sharpe": 5.081,
+    "trained_at": "2026-05-12",
+    "notes": "Z4.4 NEGATIVE-LEAN. Plurality vote with CVaR-0.3 action selection. Val +4.77 / test +5.08 — does NOT beat VOTE5_v8 (val +6.67, test +4.44) or DISTILL_v8_seed42 (val +10.41, test +9.35). Best single seed (s=0) hits test +7.95 but worse val. CVaR-0.3 is the best alpha (vs 0.1, 0.5, 1.0)."
   }
 }

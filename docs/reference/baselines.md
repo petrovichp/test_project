@@ -1,6 +1,13 @@
 # Baselines — reference systems for all future experiments
 
-> Refreshed 2026-05-11 after Path C2 (distillation) + Z2.1 (cross-asset). **Primary baseline: `VOTE5_v8_H256_DD`** (max WF, max val, 6/6 folds). **Cheap-deployment alternative: `DISTILL_v8_seed42`** (single net, 5× cheaper inference, best test Sharpe of the BTC family). **Cross-asset extensions**: `VOTE5_v8_H256_DD_eth` and `_sol` for multi-asset deployment. Reproducible end-to-end from the data files in `cache/` and the commands below. All future experiments report deltas vs `VOTE5_v8_H256_DD` (strongest aggregate) and `DISTILL_v8_seed42` (strongest test).
+> 🔒 **FROZEN 2026-05-12 (post Z4 + Z5 validation)**:
+> - **Production at fee=0 (maker-only)**: `DISTILL_v8_seed42` — single 48k-param net, test +9.35, ½× inference cost, 10-seed family-mean test +7.27 (honest), single-seed WF stdev 0.79 (half of teacher).
+> - **Production at fee>0 (taker realistic)**: `VOTE5_v8_H256_DD` — K=5 plurality, fee-robust to ~6bp breakeven (DISTILL breakeven ~3bp).
+> - **Cross-asset diversification**: `VOTE5_v8_H256_DD_{btc,eth,sol}` — ETH ~60%, SOL ~70% of BTC Sharpe.
+>
+> Z5 validation findings: long-bias asymmetry confirmed (price inversion costs 6-10 Sharpe), regime classifier output not in state vector (zero impact on shuffle), DISTILL is more feature-noise-robust on val (+0.17 Δ) than teacher (-4.18 Δ). 10-seed WF stdev: distill 0.79 vs teacher 1.67. See [z5_validation.md](../experiments/z5_validation.md).
+>
+> Z4 attempts: QR-DQN with CVaR=0.3 (val +4.77, test +5.08) and Transformer-DQN (results pending) did NOT beat the frozen baselines. See [z4_qrdqn_transformer.md](../experiments/z4_qrdqn_transformer.md).
 
 ## Quick comparison — BTC
 

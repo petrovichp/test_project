@@ -1,6 +1,27 @@
 # Development Plan — zero-fee & non-zero-fee paths
 
-This is the live forward plan as of 2026-05-10. Supersedes [next_steps.md](../archive/next_steps.md) (kept for historical reference).
+This is the live forward plan as of 2026-05-12. Supersedes [next_steps.md](../archive/next_steps.md) (kept for historical reference).
+
+## Current state (2026-05-12) — refresh after Path A/C + Z2.1 + Z4 + Z5
+
+| family | WF | val | test | folds+ | profile |
+|---|---:|---:|---:|:---:|---|
+| ⭐ `VOTE5_v8_H256_DD` (K=5, primary) | **+12.07** | +6.67 | +4.44 | 6/6 | Max WF, fee-robust (+4.58 @ 4.5bp) |
+| ⭐ `DISTILL_v8_seed42` (single, cheap-deploy) | +9.99 | **+10.41** | **+9.35** | 6/6 | Max val + test, ½ inference cost, but breakeven ~3bp |
+| `VOTE5_v8_H256_DD_eth` | +7.22 | +5.57 | −0.09 | 5/6 | Cross-asset diversifier |
+| `VOTE5_v8_H256_DD_sol` | +8.24 | +4.16 | +2.19 | 6/6 | Cross-asset diversifier |
+| `QRDQN_v8` (K=5, CVaR=0.3) | _≈+7_ | +4.77 | +5.08 | _TBD_ | Distributional RL — does NOT lift baselines |
+| `XFMR_v8` (K=5) | _pending_ | _pending_ | _pending_ | _pending_ | Self-attention over state — running |
+
+**Z5 validation findings (2026-05-12)**:
+- 10-seed single-seed WF variance: **DISTILL ±0.79 vs teacher ±1.67** (distillation halves variance)
+- Price inversion: both policies lose 6-10 Sharpe → strong long-bias asymmetry confirmed
+- Regime shuffle: zero impact (regime not in state vector — known design choice)
+- DISTILL test +9.35 at 0bp degrades faster with fees than teacher; teacher wins at 4.5bp by +5.13
+
+**Decision (Z5.4 freeze)**: ship both, choose by fee regime — DISTILL for maker-only (zero fee), VOTE5 teacher for any non-zero fee. See [docs/reference/baselines.md](baselines.md).
+
+---
 
 ## Current state — the bars to beat
 
@@ -20,7 +41,49 @@ This is the live forward plan as of 2026-05-10. Supersedes [next_steps.md](../ar
 
 ---
 
-## ⏭ Current steps — what to do next, and why
+## ⏭ Forward plan (2026-05-12) — what's next after Z4 + Z5
+
+### Where we are
+
+- **Z1-Z3 complete**: `VOTE5_v8_H256_DD` primary baseline, established WF +12.07.
+- **C2 distillation**: `DISTILL_v8_seed42` single-net alternative, test +9.35 (project record), ½× inference cost. Disjoint pool confirms (s=50 test +9.86).
+- **Z2.1 cross-asset**: ETH/SOL trained, partial transfer (~50-60% of BTC Sharpe).
+- **Z4.4 QR-DQN with CVaR**: trained 5 seeds. CVaR=0.3 ensemble val +4.77 / test +5.08 → **does NOT beat baselines**. Verdict: 🟡 LEAN-NEGATIVE.
+- **Z4.2 Transformer**: training in progress (slow CPU). Results TBD.
+- **Z5 validation**: OOD stress + 10-seed variance + fee curve all done. DISTILL has half the seed variance. Teacher wins at fee>0. Price inversion kills both — long-bias is real.
+- **Z5.4 freeze**: chosen — dual deployment of VOTE5_v8 (taker) + DISTILL_v8_seed42 (maker).
+
+### Open research questions
+
+| | bet | cost | rationale |
+|---|---|---|---|
+| **1** | **Z4.2 Transformer (pending)** | 0 (running) | Multi-head attention over state. Plausible upside on val if it learns feature interactions. |
+| **2** | **Z4.1+C2 follow-up: train more distill students with different teacher subsets** | ~30 min | DISTILL has lower seed variance than teacher. Worth seeing if a "5-teacher-ensemble distilled into 5 students" with different teacher subsets gives further variance reduction or a more robust K=5 vote of distilled students. |
+| **3** | **Long-bias mitigation** — explicit symmetric-action retrain | ~1-2 days | Both v8 and distill lose 6-10 Sharpe on price-inverted data. Suggests trained policy has long preference. Try `--symmetric-aug` (mirror prices during training, mix 50/50). |
+| **4** | **Path X — maker-only execution scoping** | engineering, ~2 days | This is the deployment path. Need to validate that maker fill rates support our trade frequency (300-1600 trades over RL period). If maker can fill, fee=0 holds and DISTILL_v8_seed42 ships. |
+| **5** | **Fee-aware distillation** | ~1 day | Re-train distill targets with fee=4.5bp during teacher rollout. The resulting student would be fee-aware-by-construction. Targets the fee gap (teacher +4.58 WF, DISTILL −0.55 WF at 4.5bp). |
+| **6** | **Combined ensemble — DISTILL ⊕ teacher** | ~1 hour | At eval time, run both teacher and student, vote. Tests if the architectures are complementary or redundant. Cheap experiment. |
+
+### Recommended order
+
+1. **Wait for Transformer to finish** (free, running). Either succeeds (worth more investigation) or fails (move on).
+2. **Cross-architecture ensemble** (#6) — cheapest, highest information ratio of remaining ideas.
+3. **Long-bias mitigation** (#3) — highest research interest. Z5.1 stress test gave hard evidence this matters.
+4. **Path X scoping** (#4) — required for production regardless of further research.
+5. **Fee-aware distillation** (#5) — only matters if Path X scoping shows maker fill rates are insufficient.
+
+### Frozen as of 2026-05-12
+
+Per [docs/reference/baselines.md](baselines.md):
+- **Primary at fee=0 (maker-only or testing)**: `DISTILL_v8_seed42` — single 48k-param net
+- **Primary at fee>0 (taker realistic)**: `VOTE5_v8_H256_DD` — K=5 plurality ensemble
+- **Cross-asset deployment**: per-ticker `VOTE5_v8_H256_DD_{btc,eth,sol}`
+
+The freeze does NOT preclude continued research; it provides a stable reference for future experiment comparisons. The "1.5-day research budget" cap per gate (from Z4 phase summary) still applies.
+
+---
+
+## Historical: 6-step plan executed 2026-05-11 (all complete)
 
 ### The starting point
 

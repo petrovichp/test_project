@@ -1,5 +1,13 @@
 # Crypto Trading ML — Results & Conclusions
 
+> **🔒 Status (2026-05-12, post Z4 + Z5 — FROZEN PRODUCTION BASELINES):**
+> - **Z4.4 QR-DQN with CVaR — NEGATIVE-LEAN** ([docs/experiments/z4_qrdqn_transformer.md](docs/experiments/z4_qrdqn_transformer.md)). Trained K=5 QRDuelingDQN (32 quantiles) with CVaR-α action selection. CVaR=0.3 is the best alpha (vs 0.1/0.5/1.0). Ensemble val +4.77, test +5.08 — **does NOT beat VOTE5_v8** (val +6.67) or **DISTILL_v8_seed42** (val +10.41, test +9.35). Best single seed (s=0) hits test +7.95. Distributional learning + risk-averse action selection don't surface new alpha here.
+> - **Z4.2 Transformer-DQN — IN PROGRESS** (CPU-bound; results pending).
+> - **Z5.1 OOD stress — DIAGNOSTIC** ([docs/experiments/z5_validation.md](docs/experiments/z5_validation.md)). Both policies lose 6-10 Sharpe under price inversion → **long-bias asymmetry confirmed**. Regime shuffle = 0 impact (regime_id not in state vector — known design). DISTILL is feature-noise-robust on val (+0.17 vs teacher −4.18).
+> - **Z5.2 10-seed variance** — DISTILL family has **half** the WF stdev of teacher (0.79 vs 1.67). Distillation is structurally more stable across seeds. K=10 plurality voting fails for teacher (5/6 folds; tie inflation).
+> - **Z5.3 Fee-curve on DISTILL vs teacher** — at OKX taker 4.5bp: teacher WF **+4.58** vs DISTILL **−0.55** (Δ +5.13). Teacher breakeven ~6bp, DISTILL ~3bp. DISTILL needs maker-only execution.
+> - **Z5.4 Freeze** ([docs/reference/baselines.md](docs/reference/baselines.md)): **Dual-deployment** chosen — `DISTILL_v8_seed42` for fee=0 (maker-only) production, `VOTE5_v8_H256_DD` for fee>0 (taker) production. Cross-asset `_eth` and `_sol` for diversification.
+>
 > **Status (2026-05-11, post Path Z2.1 — cross-asset):**
 > - **Z2.1 ETH/SOL cross-asset — MIXED-POSITIVE** ([docs/experiments/cross_asset.md](docs/experiments/cross_asset.md)). Trained `VOTE5_v8_H256_DD_<ticker>` on ETH and SOL using identical architecture/hyperparams/strategies. **All three tickers positive WF Sharpe**: BTC **+12.07**, ETH **+7.22** (5/6 folds), SOL **+8.24** (6/6 folds). Val Sharpes also positive (+6.67 / +5.57 / +4.16). Test is the soft spot: BTC +4.44, ETH **−0.09** (essentially zero), SOL +2.19. **Per-seed greedy val Sharpe was *negative* on all 10 cross-asset training runs (−6.8 to −16.3)** — plurality voting is what salvages a deployable policy. The 3-of-5 plurality threshold filters out bad trades that under-trained single seeds make. Verdict: **multi-asset deployment is viable** (~50-60% of BTC's per-asset Sharpe on ETH/SOL); cross-asset retuning a future direction. Both tickers thrive on downmoves (ETH fold 4 −41.8% → policy ×2.42 equity; SOL fold 4 −36.4% → ×2.73).
 >
