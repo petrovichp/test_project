@@ -1,5 +1,12 @@
 # Crypto Trading ML — Results & Conclusions
 
+> **🔒 Status (2026-05-13 late evening, post latency-followups — VOTE5_v8 expected production +1.5-1.7 Sharpe):**
+> - **Maker-on-entry feasibility — POSITIVE** ([docs/experiments/post_latency_improvements.md](docs/experiments/post_latency_improvements.md)). Snapshot-based fill proxy: 70-80% of trades could fill as maker within 5 bars. Adverse selection is real (filled-subset 2-4× lower mean PnL on 7 of 10 strategies) but doesn't kill the deal — trades still execute either way. **WF @ 4.5bp: +4.58 → +5.37 (N=1, conservative) → +5.72 (N=5)**. Combined with R1 AGGRESSIVE sizing: **+6.22 (N=1) / +6.44 (N=5)** = +36-40% over the current frozen baseline. Honest production estimate: +1.5-1.7 Sharpe lift over current taker deployable.
+> - **Vote × lag joint filter — NEGATIVE**. Lag adds no information beyond vote-strength. R1 AGGRESSIVE quadratic remains the best sizing scheme. Closes the question.
+> - **S12_VWAPVol — DEAD, safe to drop**. Runtime ablation shows zero impact. Drop in next state-pack rebuild (state v11 candidate).
+> - **S6_TwoSignal — KEEP**. Despite 0.42% hit rate, masking S6 costs −0.79 Sharpe. The DQN's rare S6 selections are high-quality.
+> - **Production recommendation updated**: VOTE5_v8 K=5 ensemble + AGGRESSIVE quadratic sizing + TP-exit-maker + maker-on-entry (N=1) + S12 runtime mask. Expected WF +6.0-6.3 at OKX 4.5bp taker.
+>
 > **🔒 Status (2026-05-13 evening, post R1 + R2 — VOTE5_v8 SHARPE LIFTED):**
 > - **R1 vote-strength sizing — POSITIVE (+1.16 WF Sharpe)** ([docs/experiments/r1_r2_vote_sizing_and_timing.md](docs/experiments/r1_r2_vote_sizing_and_timing.md)). VOTE5_v8 K=5 produces `votes_count` per trade (3/4/5 plurality). Per-trade quality is strongly predictive: 4-vote trades have **14× the mean PnL** of 3-vote, 5-vote trades **24× higher**. AGGRESSIVE quadratic sizing ((v−2)/3)² lifts WF from **+4.58 → +5.74** at 4.5bp taker. BINARY v=5-only sacrifices magnitude for robustness (5/6 folds positive vs 4/6). Free Sharpe — no retraining, just runtime sizing rule. Update Z5.4: VOTE5_v8 K=5 + AGGRESSIVE sizing is the new recommended fee=4.5bp deployable.
 > - **R2 trade timing — deployment-ready**. 83.5% bars-in-position; median inter-trade gap 17 min; peak rate 5 trades/hr; p95 hold 16 hours. Comfortable load profile for live execution; no concurrency or rate-limit blockers.
