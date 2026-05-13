@@ -3430,5 +3430,82 @@
     "model_file": "btc_dqn_policy_DISTILL_XFMR_v8_seed42.pt",
     "trained_at": "2026-05-12",
     "notes": "Z4.2 follow-on. NEGATIVE — distilled XFMR ensemble. Val +9.41 / test +2.83 — wide spread vs canonical DISTILL_v8_seed42 (val +10.41 / test +9.35). One fold flips negative (5/6). Student inherits weak teacher signal."
+  },
+  "VOTE5_v10_H256_DD_seed42": {
+    "ticker": "btc", "model_type": "dqn", "tag": "VOTE5_v10_H256_DD_seed42", "seed": 42,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v10_regimeoff",
+    "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "VOTE5_v10_H256_DD_seed42",
+    "wf_mean_sharpe": 9.911, "val_sharpe": 6.714, "test_sharpe": 6.806,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_VOTE5_v10_H256_DD_seed42.pt",
+    "trained_at": "2026-05-13",
+    "notes": "v10 ablation — regime dims [2:7] zeroed. Single-seed test +6.81 > v8_seed42 family-mean test +4.39."
+  },
+  "VOTE5_v10_H256_DD_seed7": {
+    "ticker": "btc", "model_type": "dqn", "tag": "VOTE5_v10_H256_DD_seed7", "seed": 7,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v10_regimeoff",
+    "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "VOTE5_v10_H256_DD_seed7",
+    "wf_mean_sharpe": 10.810, "val_sharpe": 4.408, "test_sharpe": 7.102,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_VOTE5_v10_H256_DD_seed7.pt",
+    "trained_at": "2026-05-13",
+    "notes": "v10 ablation."
+  },
+  "VOTE5_v10_H256_DD_seed123": {
+    "ticker": "btc", "model_type": "dqn", "tag": "VOTE5_v10_H256_DD_seed123", "seed": 123,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v10_regimeoff",
+    "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "VOTE5_v10_H256_DD_seed123",
+    "wf_mean_sharpe": 8.381, "val_sharpe": 6.708, "test_sharpe": 8.902,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_VOTE5_v10_H256_DD_seed123.pt",
+    "trained_at": "2026-05-13",
+    "notes": "v10 ablation. Best single-seed test (+8.90)."
+  },
+  "VOTE5_v10_H256_DD_seed0": {
+    "ticker": "btc", "model_type": "dqn", "tag": "VOTE5_v10_H256_DD_seed0", "seed": 0,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v10_regimeoff",
+    "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "VOTE5_v10_H256_DD_seed0",
+    "wf_mean_sharpe": 8.984, "val_sharpe": 5.559, "test_sharpe": 4.730,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_VOTE5_v10_H256_DD_seed0.pt",
+    "trained_at": "2026-05-13",
+    "notes": "v10 ablation."
+  },
+  "VOTE5_v10_H256_DD_seed99": {
+    "ticker": "btc", "model_type": "dqn", "tag": "VOTE5_v10_H256_DD_seed99", "seed": 99,
+    "algo": "double_dueling", "hidden": 256, "state_version": "v10_regimeoff",
+    "fee_train": 0.0, "trade_penalty": 0.001,
+    "ensemble_role": "VOTE5_v10_H256_DD_seed99",
+    "wf_mean_sharpe": 11.085, "val_sharpe": 7.828, "test_sharpe": 5.935,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_VOTE5_v10_H256_DD_seed99.pt",
+    "trained_at": "2026-05-13",
+    "notes": "v10 ablation. Best single-seed WF (+11.09)."
+  },
+  "VOTE5_v10_H256_DD_VOTE5": {
+    "ticker": "btc", "model_type": "ensemble", "tag": "VOTE5_v10_H256_DD_VOTE5",
+    "ensemble_mode": "plurality",
+    "members": ["VOTE5_v10_H256_DD_seed42", "VOTE5_v10_H256_DD_seed7",
+                "VOTE5_v10_H256_DD_seed123", "VOTE5_v10_H256_DD_seed0",
+                "VOTE5_v10_H256_DD_seed99"],
+    "wf_mean_sharpe": 10.751, "val_sharpe": 0.847, "test_sharpe": 5.546,
+    "wf_folds_positive": 5,
+    "trained_at": "2026-05-13",
+    "notes": "v10 K=5 plurality. WF +10.75 (vs v8 ensemble +12.07, Δ -1.31). Val collapsed to +0.85 (vs +6.67). Without regime as tie-breaker, seeds correlate too much — plurality diversity collapses. NOT a replacement for v8 ensemble."
+  },
+  "DISTILL_v10_seed42": {
+    "ticker": "btc", "model_type": "dqn", "tag": "DISTILL_v10_seed42", "seed": 42,
+    "algo": "dueling_distill", "hidden": 256,
+    "state_version": "v10_regimeoff", "fee_train": 0.0, "trade_penalty": 0.0,
+    "teacher": "VOTE5_v10_H256_DD_VOTE5", "targets_suffix": "v10",
+    "wf_mean_sharpe": 8.714, "val_sharpe": 7.882, "test_sharpe": 6.143,
+    "wf_folds_positive": 6,
+    "model_file": "btc_dqn_policy_DISTILL_v10_seed42.pt",
+    "trained_at": "2026-05-13",
+    "notes": "Distilled from VOTE5_v10 K=5 plurality labels. NEGATIVE vs DISTILL_v8_seed42 (WF +8.71 vs +9.99; val +7.88 vs +10.41; test +6.14 vs +9.35). Worse label quality from weakened ensemble propagated to student. The per-seed gain at v10 didn't transmit through distillation."
   }
 }

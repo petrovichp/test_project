@@ -497,7 +497,7 @@ if __name__ == "__main__":
                      help="comma-separated action indices [1..9] to mask during training "
                           "(e.g. '5' masks S6_TwoSignal, '5,8' masks S6+S10)")
     ap.add_argument("--state-version", default="v5", dest="state_version",
-                     choices=["v5", "v6", "v7_pa", "v7_basis", "v8_s11s13", "v9_basis_s11s13"],
+                     choices=["v5", "v6", "v7_pa", "v7_basis", "v8_s11s13", "v9_basis_s11s13", "v10_regimeoff"],
                      help="state-array version: v5=50-dim (default), v6=54-dim with direction probs, "
                           "v7_pa=54-dim with price-action context, v7_basis=55-dim with basis+funding, "
                           "v8_s11s13=52-dim with S11+S13 strategy flags + 12-action space, "

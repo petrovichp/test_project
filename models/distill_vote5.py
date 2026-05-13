@@ -47,16 +47,17 @@ def stratified_batch_indices(actions_tr: np.ndarray, batch: int, rng) -> np.ndar
 
 
 def train_student(seed: int, tag: str, soft_weight: float = SOFT_WEIGHT,
-                  targets_suffix: str = "v8"):
+                  targets_suffix: str = "v8", state_suffix: str = STATE_SUFFIX):
     torch.manual_seed(seed); np.random.seed(seed)
     rng = np.random.default_rng(seed + 1000)
     t0 = time.perf_counter()
 
     print(f"\n{'='*70}\n  C2 self-distillation — student tag={tag}  seed={seed}\n"
-          f"  soft_weight={soft_weight}  (0 = pure CE; >0 mixes MSE-to-Q_teacher)\n{'='*70}")
+          f"  soft_weight={soft_weight}  (0 = pure CE; >0 mixes MSE-to-Q_teacher)\n"
+          f"  state_suffix={state_suffix}  targets_suffix={targets_suffix}\n{'='*70}")
 
-    sp_tr = np.load(CACHE / "state" / f"btc_dqn_state_train{STATE_SUFFIX}.npz")
-    sp_v  = np.load(CACHE / "state" / f"btc_dqn_state_val{STATE_SUFFIX}.npz")
+    sp_tr = np.load(CACHE / "state" / f"btc_dqn_state_train{state_suffix}.npz")
+    sp_v  = np.load(CACHE / "state" / f"btc_dqn_state_val{state_suffix}.npz")
     tgt_tr = np.load(CACHE / "distill" / f"btc_distill_targets_train_{targets_suffix}.npz")
     tgt_v  = np.load(CACHE / "distill" / f"btc_distill_targets_val_{targets_suffix}.npz")
 
@@ -185,5 +186,7 @@ if __name__ == "__main__":
                     help="weight on MSE-to-teacher-Q (0 = pure CE distillation)")
     ap.add_argument("--targets-suffix", default="v8", dest="targets_suffix",
                     help="suffix for btc_distill_targets_{split}_{suffix}.npz")
+    ap.add_argument("--state-suffix", default=STATE_SUFFIX, dest="state_suffix",
+                    help="suffix for btc_dqn_state_{split}{suffix}.npz")
     args = ap.parse_args()
-    train_student(args.seed, args.tag, args.soft_weight, args.targets_suffix)
+    train_student(args.seed, args.tag, args.soft_weight, args.targets_suffix, args.state_suffix)
